@@ -110,6 +110,10 @@ private:
 	char *testtheme;
 	bool testing;
 
+#ifdef USE_CONSOLEKIT
+	bool consolekit_support_enabled;
+#endif
+
 	std::string themeName;
 	std::string mcookie;
 

@@ -81,6 +81,7 @@ namespace PAM {
 		void fail_delay(const unsigned int micro_sec);
 #endif
 		void authenticate(void);
+		void check_acct(void);
 		void open_session(void);
 		void close_session(void);
 		void setenv(const std::string& key, const std::string& value);

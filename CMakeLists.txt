@@ -18,7 +18,7 @@ INCLUDE(CheckTypeSize)
 # Version
 set(SLIM_VERSION_MAJOR "1")
 set(SLIM_VERSION_MINOR "3")
-set(SLIM_VERSION_PATCH "6")
+set(SLIM_VERSION_PATCH "7")
 set(SLIM_VERSION "${SLIM_VERSION_MAJOR}.${SLIM_VERSION_MINOR}.${SLIM_VERSION_PATCH}")
 
 set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Installation Directory")
@@ -101,7 +101,6 @@ find_package(X11 REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(JPEG REQUIRED)
 find_package(PNG REQUIRED)
-find_package(ZLIB REQUIRED)
 
 # Fontconfig
 set(FONTCONFIG_DIR ${CMAKE_MODULE_PATH})
@@ -120,6 +119,7 @@ if(USE_PAM)
 		message("\tPAM Found")
 		set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DUSE_PAM")
 		target_link_libraries(${PROJECT_NAME} ${PAM_LIBRARY})
+		target_link_libraries(libslim ${PAM_LIBRARY})
 		target_link_libraries(slimlock ${PAM_LIBRARY})
 		include_directories(${PAM_INCLUDE_DIR})
 	else(PAM_FOUND)
@@ -170,7 +170,7 @@ include_directories(
 	${X11_Xft_INCLUDE_PATH}
 	${X11_Xrender_INCLUDE_PATH}
 	${X11_Xrandr_INCLUDE_PATH}
-	${FREETYPE_INCLUDE_DIR_freetype2}
+	${FREETYPE_INCLUDE_DIRS}
 	${X11_Xmu_INCLUDE_PATH}
 	${ZLIB_INCLUDE_DIR}
 	${JPEG_INCLUDE_DIR}
@@ -178,7 +178,10 @@ include_directories(
 )
 
 target_link_libraries(libslim
-    ${JPEG_LIBRARIES}
+	${RT_LIB}
+	${X11_Xft_LIB}
+	${X11_Xrandr_LIB}
+	${JPEG_LIBRARIES}
 	${PNG_LIBRARIES}
 )
 
@@ -221,7 +224,6 @@ endif(BUILD_SLIMLOCK)
 ####### install
 # slim
 install(TARGETS slim RUNTIME DESTINATION bin)
-install(TARGETS slimlock RUNTIME DESTINATION bin)
 
 if (BUILD_SHARED_LIBS)
 	set_target_properties(libslim PROPERTIES
@@ -229,19 +231,25 @@ if (BUILD_SHARED_LIBS)
 		SOVERSION ${SLIM_VERSION})
 
 	install(TARGETS libslim
-		LIBRARY DESTINATION lib
-		ARCHIVE DESTINATION lib
+		LIBRARY DESTINATION lib${LIB_SUFFIX}
+		ARCHIVE DESTINATION lib${LIB_SIFFUX}
 	)
 endif (BUILD_SHARED_LIBS)
 
 # man file
 install(FILES slim.1 DESTINATION ${MANDIR}/man1/)
-install(FILES slimlock.1 DESTINATION ${MANDIR}/man1/)
 # configure
 install(FILES slim.conf DESTINATION ${SYSCONFDIR})
-# systemd service file
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-	install(FILES slim.service DESTINATION ${LIBDIR}/systemd/system)
-endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+# systemd service file - commented out as broken - not all Linux uses systemd!
+#if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+#	install(FILES slim.service DESTINATION ${LIBDIR}/systemd/system)
+#endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+
+#slimlock
+if(BUILD_SLIMLOCK)
+	install(TARGETS slimlock RUNTIME DESTINATION bin PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID)
+	install(FILES slimlock.1 DESTINATION ${MANDIR}/man1/)
+endif(BUILD_SLIMLOCK)
+
 # themes directory
 subdirs(themes)

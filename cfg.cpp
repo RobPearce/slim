@@ -274,14 +274,14 @@ void Cfg::split(vector<string>& v, const string& str, char c, bool useEmpty) {
 	while (true) {
 		string::const_iterator begin = s;
 		while (*s != c && s != str.end()) { ++s; }
-	tmp = string(begin, s);
-	if (useEmpty || tmp.size() > 0)
+		tmp = string(begin, s);
+		if (useEmpty || tmp.size() > 0)
 			v.push_back(tmp);
 		if (s == str.end()) {
 			break;
 		}
 		if (++s == str.end()) {
-		if (useEmpty)
+			if (useEmpty)
 				v.push_back("");
 			break;
 		}
@@ -289,6 +289,7 @@ void Cfg::split(vector<string>& v, const string& str, char c, bool useEmpty) {
 }
 
 void Cfg::fillSessionList(){
+	string strSessionList = getOption("sessions");
 	string strSessionDir  = getOption("sessiondir");
 
 	sessions.clear();
@@ -311,25 +312,28 @@ void Cfg::fillSessionList(){
 							access(strFile.c_str(), R_OK) == 0){
 						ifstream desktop_file(strFile.c_str());
 						if (desktop_file){
-							 string line, session_name = "", session_exec = "";
-							 while (getline( desktop_file, line )) {
-								 if (line.substr(0, 5) == "Name=") {
-									 session_name = line.substr(5);
-									 if (!session_exec.empty())
+							string line, session_name = "", session_exec = "";
+							while (getline( desktop_file, line )) {
+								if (line.substr(0, 5) == "Name=") {
+									session_name = line.substr(5);
+									if (!session_exec.empty())
 										 break;
-								 } else
-									 if (line.substr(0, 5) == "Exec=") {
-										 session_exec = line.substr(5);
-										 if (!session_name.empty())
-											 break;
-									 }
-							 }
-							 desktop_file.close();
-							 pair<string,string> session(session_name,session_exec);
-							 sessions.push_back(session);
-							 cout << session_exec << " - " << session_name << endl;
+								}
+								else if (line.substr(0, 5) == "Exec=") {
+									session_exec = line.substr(5);
+									if (!session_name.empty())
+										break;
+								}
+							}
+							desktop_file.close();
+							if (!session_name.empty() && !session_exec.empty()) {
+								pair<string,string> session(session_name,session_exec);
+								sessions.push_back(session);
+							} else if (access(strFile.c_str(), X_OK) == 0) {
+								pair<string,string> session(string(pDirent->d_name),strFile);
+								sessions.push_back(session);
+							}
 						}
-
 					}
 				}
 			}
@@ -338,8 +342,18 @@ void Cfg::fillSessionList(){
 	}
 
 	if (sessions.empty()){
-		pair<string,string> session("","");
-		sessions.push_back(session);
+		if (strSessionList.empty()) {
+			pair<string,string> session("","");
+			sessions.push_back(session);
+		} else {
+			// iterate through the split of the session list
+			vector<string> sessit;
+			split(sessit,strSessionList,',',false);
+			for (vector<string>::iterator it = sessit.begin(); it != sessit.end(); ++it) {
+				pair<string,string> session(*it,*it);
+				sessions.push_back(session);
+			}
+		}
 	}
 }
 

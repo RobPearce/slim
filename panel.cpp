@@ -11,6 +11,7 @@
 
 #include <sstream>
 #include <poll.h>
+#include <libgen.h>
 #include <X11/extensions/Xrandr.h>
 #include "panel.h"
 
@@ -48,7 +49,7 @@ Panel::Panel(Display* dpy, int scr, Window root, Cfg* config,
 		gcm = GCGraphicsExposures;
 		gcv.graphics_exposures = False;
 		WinGC = XCreateGC(Dpy, Win, gcm, &gcv);
-		if (WinGC < 0) {
+		if (WinGC == 0) {
 			cerr << APPNAME
 				<< ": failed to create pixmap\n.";
 			exit(ERR_EXIT);
@@ -625,7 +626,7 @@ bool Panel::OnKeyPress(XEvent& event) {
 					break;
 				};
 			}
-			else {
+			else {	// *RP* I think this is to fix the fake bolding if the user presses TAB
 				return true; //nodraw if notchange
 			};
 			break;

@@ -24,8 +24,7 @@ namespace Ck {
 				errstr(errstr)
 	{}
 
-	dbus_bool_t
-	Session::ck_connector_open_graphic_session(
+	dbus_bool_t Session::ck_connector_open_graphic_session(
 					const std::string &display,
 					uid_t uid)
 	{
@@ -93,7 +92,7 @@ namespace Ck {
 
 		vt = *((long *)return_value);
 
-		std::snprintf(device, 32, "/dev/tty%ld", vt);
+		std::sprintf(device, "/dev/tty%ld", vt);
 
 		if(return_value)
 			XFree(return_value);

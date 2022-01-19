@@ -45,7 +45,7 @@ int conv(int num_msg, const struct pam_message **msg,
 
 	for (i = 0; i < num_msg; i++) {
 		(*resp)[i].resp = 0;
-		(*resp)[i].resp_retcodei = 0;
+		(*resp)[i].resp_retcode = 0;
 		switch (msg[i]->msg_style) {
 			case PAM_PROMPT_ECHO_ON:
 				/* We assume PAM is asking for the username */
@@ -149,11 +149,14 @@ App::App(int argc, char** argv)
 	daemonmode = false;
 	force_nodaemon = false;
 	firstlogin = true;
+#ifdef USE_CONSOLEKIT
+	consolekit_support_enabled = true;
+#endif
 	Dpy = NULL;
 
 	/* Parse command line
 	   Note: we force a option for nodaemon switch to handle "-nodaemon" */
-	while ((tmp = getopt(argc, argv, "vhp:n:d?")) != EOF) {
+	while((tmp = getopt(argc, argv, "vhsp:n:d?")) != EOF) {
 		switch (tmp) {
 		case 'p':	/* Test theme */
 			testtheme = optarg;
@@ -174,14 +177,22 @@ App::App(int argc, char** argv)
 			std::cout << APPNAME << " version " << VERSION << endl;
 			exit(OK_EXIT);
 			break;
+#ifdef USE_CONSOLEKIT
+		case 's':	/* Disable consolekit support */
+			consolekit_support_enabled = false;
+			break;
+#endif
 		case '?':	/* Illegal */
 			logStream << endl;
 		case 'h':   /* Help */
-			logStream << "usage:  " << APPNAME << " [option ...]" << endl
+			std::cout << "usage:  " << APPNAME << " [option ...]" << endl
 			<< "options:" << endl
 			<< "	-d: daemon mode" << endl
-			<< "	-nodaemon: no-daemon mode" << endl
+			<< "	-n: no-daemon mode" << endl
 			<< "	-v: show version" << endl
+#ifdef USE_CONSOLEKIT
+			<< "	-s: start for systemd, disable consolekit support" << endl
+#endif
 			<< "	-p /path/to/theme/dir: preview theme" << endl;
 			exit(OK_EXIT);
 			break;
@@ -235,7 +246,8 @@ void App::Run()
 		pam.start("slim");
 		pam.set_item(PAM::Authenticator::TTY, DisplayName);
 		pam.set_item(PAM::Authenticator::Requestor, "root");
-	} catch(PAM::Exception& e) {
+	}
+	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
 		exit(ERR_EXIT);
 	}
@@ -333,12 +345,22 @@ void App::Run()
 
 	if (firstlogin && cfg->getOption("default_user") != "") {
 		LoginPanel->SetName(cfg->getOption("default_user"));
+		firstlogin = false;
 #ifdef USE_PAM
 		pam.set_item(PAM::Authenticator::User, cfg->getOption("default_user").c_str());
 #endif
-		firstlogin = false;
 		if (autologin) {
+#ifdef USE_PAM
+			try {
+				pam.check_acct();
+#endif
 			Login();
+#ifdef USE_PAM
+			}
+			catch(PAM::Auth_Exception& e){
+				// The default user is invalid
+			}
+#endif
 		}
 	}
 
@@ -372,10 +394,15 @@ void App::Run()
 		LoginPanel->Reset();
 
 		if (firstloop && cfg->getOption("default_user") != "")
+		{
 			LoginPanel->SetName(cfg->getOption("default_user"));
+		}
 
-        if (firstloop)
-            LoginPanel->SwitchSession();
+		if (firstloop)
+		{
+			// Removed by Gentoo "session-chooser" patch
+			//LoginPanel->SwitchSession();
+        	}
 
 		if (!AuthenticateUser(focuspass && firstloop)) {
 			panelclosed = 0;
@@ -390,7 +417,9 @@ void App::Run()
 		Action = LoginPanel->getAction();
 		/* for themes test we just quit */
 		if (testing)
+		{
 			Action = Panel::Exit;
+		}
 
 		panelclosed = 1;
 		LoginPanel->ClosePanel();
@@ -428,7 +457,8 @@ bool App::AuthenticateUser(bool focuspass)
 		if (!focuspass)
 			pam.set_item(PAM::Authenticator::User, 0);
 		pam.authenticate();
-	} catch(PAM::Auth_Exception& e) {
+	}
+	catch(PAM::Auth_Exception& e){
 		switch (LoginPanel->getAction()) {
 			case Panel::Exit:
 			case Panel::Console:
@@ -438,7 +468,8 @@ bool App::AuthenticateUser(bool focuspass)
 		}
 		logStream << APPNAME << ": " << e << endl;
 		return false;
-	} catch(PAM::Exception& e) {
+	}
+	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
 		exit(ERR_EXIT);
 	}
@@ -529,11 +560,13 @@ void App::Login()
 	try{
 		pam.open_session();
 		pw = getpwnam(static_cast<const char*>(pam.get_item(PAM::Authenticator::User)));
-	} catch(PAM::Cred_Exception& e) {
+	}
+	catch(PAM::Cred_Exception& e){
 		/* Credentials couldn't be established */
 		logStream << APPNAME << ": " << e << endl;
 		return;
-	} catch(PAM::Exception& e) {
+	}
+	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
 		exit(ERR_EXIT);
 	}
@@ -570,20 +603,23 @@ void App::Login()
 		pam.setenv("DISPLAY", DisplayName);
 		pam.setenv("MAIL", maildir.c_str());
 		pam.setenv("XAUTHORITY", xauthority.c_str());
-	} catch(PAM::Exception& e) {
+	}
+	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
 		exit(ERR_EXIT);
 	}
 #endif
 
 #ifdef USE_CONSOLEKIT
-	/* Setup the ConsoleKit session */
-	try {
-		ck.open_session(DisplayName, pw->pw_uid);
-	}
-	catch(Ck::Exception &e) {
-		logStream << APPNAME << ": " << e << endl;
-		exit(ERR_EXIT);
+	if (consolekit_support_enabled) {
+		/* Setup the ConsoleKit session */
+		try {
+			ck.open_session(DisplayName, pw->pw_uid);
+		}
+		catch(Ck::Exception &e) {
+			logStream << APPNAME << ": " << e << endl;
+			exit(ERR_EXIT);
+		}
 	}
 #endif
 
@@ -596,18 +632,20 @@ void App::Login()
 		char** child_env = pam.getenvlist();
 
 # ifdef USE_CONSOLEKIT
-		char** old_env = child_env;
+		if (consolekit_support_enabled) {
+			char** old_env = child_env;
 
-		/* Grow the copy of the environment for the session cookie */
-		int n;
-		for (n = 0; child_env[n] != NULL ; n++);
+			/* Grow the copy of the environment for the session cookie */
+			int n;
+			for (n = 0; child_env[n] != NULL ; n++);
 
-		n++;
+			n++;
 
-		child_env = static_cast<char**>(malloc(sizeof(char*)*n));
-		memcpy(child_env, old_env, sizeof(char*)*n+1);
-		child_env[n - 1] = StrConcat("XDG_SESSION_COOKIE=", ck.get_xdg_session_cookie());
-		child_env[n] = NULL;
+			child_env = static_cast<char**>(malloc(sizeof(char*)*(n+1)));
+			memcpy(child_env, old_env, sizeof(char*)*n);
+			child_env[n - 1] = StrConcat("XDG_SESSION_COOKIE=", ck.get_xdg_session_cookie());
+			child_env[n] = 0;
+		}
 # endif /* USE_CONSOLEKIT */
 #else
 
@@ -629,7 +667,8 @@ void App::Login()
 		child_env[n++]=StrConcat("MAIL=", maildir.c_str());
 		child_env[n++]=StrConcat("XAUTHORITY=", xauthority.c_str());
 # ifdef USE_CONSOLEKIT
-		child_env[n++]=StrConcat("XDG_SESSION_COOKIE=", ck.get_xdg_session_cookie());
+		if (consolekit_support_enabled)
+			child_env[n++]=StrConcat("XDG_SESSION_COOKIE=", ck.get_xdg_session_cookie());
 # endif /* USE_CONSOLEKIT */
 		child_env[n++]=0;
 
@@ -674,17 +713,21 @@ void App::Login()
 	}
 
 #ifdef USE_CONSOLEKIT
-	try {
-		ck.close_session();
-	} catch(Ck::Exception &e) {
-		logStream << APPNAME << ": " << e << endl;
+	if (consolekit_support_enabled) {
+		try {
+			ck.close_session();
+		}
+		catch(Ck::Exception &e) {
+			logStream << APPNAME << ": " << e << endl;
+		}
 	}
 #endif
 
 #ifdef USE_PAM
 	try {
 		pam.close_session();
-	} catch(PAM::Exception& e) {
+	}
+	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
 	}
 #endif
@@ -715,7 +758,8 @@ void App::Reboot()
 #ifdef USE_PAM
 	try {
 		pam.end();
-	} catch(PAM::Exception& e) {
+	}
+	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
 	}
 #endif
@@ -737,7 +781,8 @@ void App::Halt()
 #ifdef USE_PAM
 	try {
 		pam.end();
-	} catch (PAM::Exception& e) {
+	}
+	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
 	}
 #endif
@@ -782,7 +827,8 @@ void App::Exit()
 #ifdef USE_PAM
 	try {
 		pam.end();
-	} catch(PAM::Exception& e) {
+	}
+	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
 	}
 #endif
@@ -812,15 +858,21 @@ void App::RestartServer()
 #ifdef USE_PAM
 	try {
 		pam.end();
-	} catch(PAM::Exception& e) {
+	}
+	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
 	}
 #endif
 
 	StopServer();
 	RemoveLock();
-	while (waitpid(-1, NULL, WNOHANG) > 0); /* Collects all dead childrens */
-	Run();
+	if (force_nodaemon) {
+		delete LoginPanel;
+		exit(ERR_EXIT); /* use ERR_EXIT so that systemd's RESTART=on-failure works */
+	} else {
+		while (waitpid(-1, NULL, WNOHANG) > 0); /* Collects all dead childrens */
+		Run();
+	}
 }
 
 void App::KillAllClients(Bool top)
