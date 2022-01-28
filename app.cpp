@@ -404,10 +404,16 @@ void App::Run()
 			//LoginPanel->SwitchSession();
         	}
 
-		if (!AuthenticateUser(focuspass && firstloop)) {
+		if (!AuthenticateUser(focuspass && firstloop))
+		{
+			unsigned int cfg_passwd_timeout;
+			cfg_passwd_timeout = Cfg::string2int(cfg->getOption("wrong_passwd_timeout").c_str());
+			if ( cfg_passwd_timeout > 60 )
+				cfg_passwd_timeout = 60;
 			panelclosed = 0;
 			firstloop = false;
 			LoginPanel->ClearPanel();
+			LoginPanel->WrongPassword(cfg_passwd_timeout);
 			XBell(Dpy, 100);
 			continue;
 		}

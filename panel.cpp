@@ -280,6 +280,7 @@ void Panel::ClearPanel() {
 void Panel::WrongPassword(int timeout) {
 	string message;
 	XGlyphInfo extents;
+	XWindowAttributes attributes;
 
 #if 0
 	if (CapsLockOn)
@@ -287,6 +288,8 @@ void Panel::WrongPassword(int timeout) {
 	else
 #endif
 	message = cfg->getOption("passwd_feedback_msg");
+
+	XGetWindowAttributes(Dpy, Win, &attributes);
 
 	XftDraw *draw = XftDrawCreate(Dpy, Win,
 		DefaultVisual(Dpy, Scr), DefaultColormap(Dpy, Scr));
@@ -297,8 +300,8 @@ void Panel::WrongPassword(int timeout) {
 	string cfgY = cfg->getOption("passwd_feedback_y");
 	int shadowXOffset = cfg->getIntOption("msg_shadow_xoffset");
 	int shadowYOffset = cfg->getIntOption("msg_shadow_yoffset");
-	int msg_x = Cfg::absolutepos(cfgX, XWidthOfScreen(ScreenOfDisplay(Dpy, Scr)), extents.width);
-	int msg_y = Cfg::absolutepos(cfgY, XHeightOfScreen(ScreenOfDisplay(Dpy, Scr)), extents.height);
+	int msg_x = Cfg::absolutepos(cfgX, attributes.width, extents.width);
+	int msg_y = Cfg::absolutepos(cfgY, attributes.height, extents.height);
 
 	OnExpose();
 	SlimDrawString8(draw, &msgcolor, msgfont, msg_x, msg_y, message,
