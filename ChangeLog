@@ -1,4 +1,4 @@
-1.3.7 - tbd
+1.3.7 - 2022.01.30
 	* Imported several bug fixes from the Gentoo package:
 		libslim-cmake-fixes
 		disable-ck-for-systemd
@@ -10,6 +10,9 @@
 		wrong comparison for XCreateGC error return (GCC11 needs it fixed!)
 	* Fixed a bug in handling expired user accounts with PAM
 	* Show a message on login failure (using the same method as slimlock)
+
+
+ ---   The releases below were the original SLiM project   ---
 
 1.3.6 - 2013.10.01
 	* Merge slimlock.
