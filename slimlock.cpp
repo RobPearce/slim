@@ -21,6 +21,7 @@
 #include <pthread.h>
 #include <err.h>
 #include <signal.h>
+#include <unistd.h>			// for usleep
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -31,6 +32,7 @@
 #include "cfg.h"
 #include "util.h"
 #include "panel.h"
+#include "const.h"
 
 #undef APPNAME
 #define APPNAME "slimlock"
@@ -51,6 +53,7 @@ void *RaiseWindow(void *data);
 Display* dpy;
 int scr;
 Window win;
+Window root;
 Cfg* cfg;
 Panel* loginPanel;
 string themeName = "";
@@ -62,8 +65,8 @@ CARD16 dpms_standby, dpms_suspend, dpms_off, dpms_level;
 BOOL dpms_state, using_dpms;
 int term;
 
-static void
-die(const char *errstr, ...) {
+static void die(const char *errstr, ...)
+{
 	va_list ap;
 
 	va_start(ap, errstr);
@@ -72,17 +75,19 @@ die(const char *errstr, ...) {
 	exit(EXIT_FAILURE);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
 	if((argc == 2) && !strcmp("-v", argv[1]))
-		die(APPNAME"-"VERSION", © 2010-2012 Joel Burget\n");
+		die ( APPNAME "-" VERSION ", © 2010-2012 Joel Burget\n" );
 	else if(argc != 1)
-		die("usage: "APPNAME" [-v]\n");
+		die ( "usage: " APPNAME " [-v]\n" );
 
 	void (*prev_fn)(int);
 
 	// restore DPMS settings should slimlock be killed in the line of duty
 	prev_fn = signal(SIGTERM, HandleSignal);
-	if (prev_fn == SIG_IGN) signal(SIGTERM, SIG_IGN);
+	if (prev_fn == SIG_IGN)
+		signal(SIGTERM, SIG_IGN);
 
 	// create a lock file to solve mutliple instances problem
 	// /var/lock used to be the place to put this, now it's /run/lock
@@ -92,9 +97,9 @@ int main(int argc, char **argv) {
 
 	// try /run/lock first, since i believe it's preferred
 	if (!stat("/run/lock", &statbuf))
-		lock_file = open("/run/lock/"APPNAME".lock", O_CREAT | O_RDWR, 0666);
+		lock_file = open ( "/run/lock/" APPNAME ".lock", O_CREAT | O_RDWR, 0666);
 	else
-		lock_file = open("/var/lock/"APPNAME".lock", O_CREAT | O_RDWR, 0666);
+		lock_file = open ( "/var/lock/" APPNAME ".lock", O_CREAT | O_RDWR, 0666);
 
 	int rc = flock(lock_file, LOCK_EX | LOCK_NB);
 
@@ -151,19 +156,12 @@ int main(int argc, char **argv) {
 	wa.background_pixel = BlackPixel(dpy, scr);
 
 	// Create a full screen window
-	Window root = RootWindow(dpy, scr);
-	win = XCreateWindow(dpy,
-	  root,
-	  0,
-	  0,
-	  DisplayWidth(dpy, scr),
-	  DisplayHeight(dpy, scr),
-	  0,
-	  DefaultDepth(dpy, scr),
-	  CopyFromParent,
-	  DefaultVisual(dpy, scr),
-	  CWOverrideRedirect | CWBackPixel,
-	  &wa);
+	root = RootWindow(dpy, scr);
+	win = XCreateWindow(dpy, root,
+			0, 0, DisplayWidth(dpy, scr), DisplayHeight(dpy, scr),
+			0, DefaultDepth(dpy, scr), CopyFromParent,
+			DefaultVisual(dpy, scr), CWOverrideRedirect | CWBackPixel,
+			&wa);
 	XMapWindow(dpy, win);
 
 	XFlush(dpy);
@@ -360,7 +358,8 @@ void HandleSignal(int sig)
 	die(APPNAME": Caught signal; dying\n");
 }
 
-void* RaiseWindow(void *data) {
+void* RaiseWindow(void *data)
+{
 	while(1) {
 		XRaiseWindow(dpy, win);
 		sleep(1);

@@ -22,7 +22,8 @@
 #define THEMESDIR PKGDATADIR"/themes"
 #define THEMESFILE "/slim.theme"
 
-class Cfg {
+class Cfg
+{
 
 public:
 	Cfg();

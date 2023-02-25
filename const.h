@@ -1,18 +1,17 @@
 /* SLiM - Simple Login Manager
-   Copyright (C) 1997, 1998 Per Liden
-   Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
-   Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-*/
+ *  Copyright (C) 1997, 1998 Per Liden
+ *  Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
+ *  Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ */
 
 #ifndef _CONST_H_
 #define _CONST_H_
 
-#define APPNAME	"slim"
 #define DISPLAY	":0.0"
 
 #define CONSOLE_STR	 "console"
@@ -23,9 +22,6 @@
 
 #define HIDE		0
 #define SHOW		1
-
-#define GET_NAME	0
-#define GET_PASSWD  1
 
 #define OK_EXIT	 0
 #define ERR_EXIT	1

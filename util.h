@@ -11,7 +11,8 @@
 
 #include <string>
 
-namespace Util {
+namespace Util
+{
 	bool add_mcookie(const std::string &mcookie, const char *display,
 		const std::string &xauth_cmd, const std::string &authfile);
 

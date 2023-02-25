@@ -32,7 +32,8 @@
 #include "Ck.h"
 #endif
 
-class App {
+class App
+{
 public:
 	App(int argc, char **argv);
 	~App();

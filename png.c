@@ -27,8 +27,7 @@
 #include <png.h>
 #include "const.h"
 
-int
-read_png(const char *filename, int *width, int *height, unsigned char **rgb,
+int read_png(const char *filename, int *width, int *height, unsigned char **rgb,
 	 unsigned char **alpha)
 {
 	int ret = 0;

@@ -17,12 +17,12 @@
 
 #include "Ck.h"
 
-namespace Ck {
-	Exception::Exception(const std::string &func,
-				const std::string &errstr):
-				func(func),
-				errstr(errstr)
-	{}
+namespace Ck
+{
+	Exception::Exception(const std::string &func, const std::string &errstr)
+		: func(func), errstr(errstr)
+	{
+	}
 
 	dbus_bool_t Session::ck_connector_open_graphic_session(
 					const std::string &display,

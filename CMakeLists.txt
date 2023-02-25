@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.6.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR)
 
 set(PROJECT_NAME slim)
 project(${PROJECT_NAME})
@@ -14,18 +14,16 @@ INCLUDE(CheckIncludeFile)
 INCLUDE(CheckCCompilerFlag)
 INCLUDE(CheckCXXCompilerFlag)
 INCLUDE(CheckTypeSize)
+INCLUDE(GNUInstallDirs)
 
 # Version
 set(SLIM_VERSION_MAJOR "1")
 set(SLIM_VERSION_MINOR "3")
-set(SLIM_VERSION_PATCH "7")
+set(SLIM_VERSION_PATCH "8")
 set(SLIM_VERSION "${SLIM_VERSION_MAJOR}.${SLIM_VERSION_MINOR}.${SLIM_VERSION_PATCH}")
 
-set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Installation Directory")
-set(PKGDATADIR "${CMAKE_INSTALL_PREFIX}/share/slim")
+set(PKGDATADIR "${CMAKE_INSTALL_FULL_DATADIR}/slim")
 set(SYSCONFDIR "/etc")
-set(LIBDIR "/lib")
-set(MANDIR "${CMAKE_INSTALL_PREFIX}/share/man")
 
 set(SLIM_DEFINITIONS)
 if(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD" OR
@@ -37,15 +35,10 @@ else()
 	set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DHAVE_SHADOW")
 endif()
 
-set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DPACKAGE=\"slim\"")
+set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DAPPNAME=\"${PROJECT_NAME}\"")
 set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DVERSION=\"${SLIM_VERSION}\"")
 set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DPKGDATADIR=\"${PKGDATADIR}\"")
 set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DSYSCONFDIR=\"${SYSCONFDIR}\"")
-
-# Flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -O2")
-set(CMAKE_CPP_FLAGS "${CMAKE_CPP_FLAGS} -Wall -g -O2")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -O2")
 
 # source 
 set(slim_srcs
@@ -89,7 +82,7 @@ if(USE_CONSOLEKIT)
 	set(slim_srcs ${slim_srcs} Ck.cpp)
 endif(USE_CONSOLEKIT)
 
-add_executable(${PROJECT_NAME} ${slim_srcs})
+add_executable(slim ${slim_srcs})
 if(BUILD_SLIMLOCK)
     add_executable(slimlock ${slimlock_srcs})
 endif(BUILD_SLIMLOCK)
@@ -107,7 +100,7 @@ set(FONTCONFIG_DIR ${CMAKE_MODULE_PATH})
 find_package(FONTCONFIG REQUIRED)
 if(FONTCONFIG_FOUND)
 	message("\tFontConfig Found")
-	target_link_libraries(${PROJECT_NAME} ${FONTCONFIG_LIBRARY})
+	target_link_libraries(slim ${FONTCONFIG_LIBRARY})
 	include_directories(${FONTCONFIG_INCLUDE_DIR})
 endif(FONTCONFIG_FOUND)
 
@@ -118,7 +111,7 @@ if(USE_PAM)
 	if(PAM_FOUND)
 		message("\tPAM Found")
 		set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DUSE_PAM")
-		target_link_libraries(${PROJECT_NAME} ${PAM_LIBRARY})
+		target_link_libraries(slim ${PAM_LIBRARY})
 		target_link_libraries(libslim ${PAM_LIBRARY})
 		target_link_libraries(slimlock ${PAM_LIBRARY})
 		include_directories(${PAM_INCLUDE_DIR})
@@ -139,11 +132,11 @@ if(USE_CONSOLEKIT)
 		find_package(DBus REQUIRED)
 		if(DBUS_FOUND)
 			message("\tDBus Found")
-			target_link_libraries(${PROJECT_NAME} ${DBUS_LIBRARIES})
+			target_link_libraries(slim ${DBUS_LIBRARIES})
 			include_directories(${DBUS_ARCH_INCLUDE_DIR})
 			include_directories(${DBUS_INCLUDE_DIR})
 			set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DUSE_CONSOLEKIT")
-			target_link_libraries(${PROJECT_NAME} ${CKCONNECTOR_LIBRARIES})
+			target_link_libraries(slim ${CKCONNECTOR_LIBRARIES})
 			include_directories(${CKCONNECTOR_INCLUDE_DIR})
 		else(DBUS_FOUND)
 			message("\tDBus Not Found")
@@ -186,7 +179,7 @@ target_link_libraries(libslim
 )
 
 #Set up library with all found packages for slim
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(slim
 	${M_LIB}
 	${RT_LIB}
 	${CRYPTO_LIB}
@@ -223,7 +216,7 @@ endif(BUILD_SLIMLOCK)
 
 ####### install
 # slim
-install(TARGETS slim RUNTIME DESTINATION bin)
+install(TARGETS slim RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if (BUILD_SHARED_LIBS)
 	set_target_properties(libslim PROPERTIES
@@ -231,15 +224,17 @@ if (BUILD_SHARED_LIBS)
 		SOVERSION ${SLIM_VERSION})
 
 	install(TARGETS libslim
-		LIBRARY DESTINATION lib${LIB_SUFFIX}
-		ARCHIVE DESTINATION lib${LIB_SIFFUX}
+		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	)
 endif (BUILD_SHARED_LIBS)
 
 # man file
-install(FILES slim.1 DESTINATION ${MANDIR}/man1/)
+install(FILES slim.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+
 # configure
-install(FILES slim.conf DESTINATION ${SYSCONFDIR})
+install(FILES slim.conf DESTINATION ${CMAKE_INSTALL_SYSCONFDIR})
+
 # systemd service file - commented out as broken - not all Linux uses systemd!
 #if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 #	install(FILES slim.service DESTINATION ${LIBDIR}/systemd/system)
@@ -247,8 +242,8 @@ install(FILES slim.conf DESTINATION ${SYSCONFDIR})
 
 #slimlock
 if(BUILD_SLIMLOCK)
-	install(TARGETS slimlock RUNTIME DESTINATION bin PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID)
-	install(FILES slimlock.1 DESTINATION ${MANDIR}/man1/)
+	install(TARGETS slimlock RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID)
+	install(FILES slimlock.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif(BUILD_SLIMLOCK)
 
 # themes directory

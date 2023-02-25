@@ -1,3 +1,13 @@
+1.3.8 - 2022.03.01
+	* Fixed some bugs listed on bugs.gentoo.org:
+	    832303 - failed to build with clang, Invalid suffix on string literal
+	    580458 - open fd on /var/log/slim.log passed to session
+	* Fixed handling of log stream so that all the code uses the same instance
+	* Handle return values from calls, to clean up warn-unused-result warnings
+	* Fixed "sessions" config option (the earlier patch was incomplete)
+	* Several QA improvements
+	* Updated cmake config - use standard install paths, don't force options
+
 1.3.7 - 2022.01.30
 	* Imported several bug fixes from the Gentoo package:
 		libslim-cmake-fixes

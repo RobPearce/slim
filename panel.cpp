@@ -1,33 +1,35 @@
-/* SLiM - Simple Login Manager
-   Copyright (C) 1997, 1998 Per Liden
-   Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
-   Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-*/
+/*
+ * SLiM - Simple Login Manager
+ *  Copyright (C) 1997, 1998 Per Liden
+ *  Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
+ *  Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
+ *  Copyright (C) 2022 Rob Pearce <slim@flitspace.org.uk>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ */
 
 #include <sstream>
 #include <poll.h>
 #include <libgen.h>
 #include <X11/extensions/Xrandr.h>
+#include <unistd.h>			// for sleep
+#include "const.h"
+#include "image.h"
+#include "log.h"
+#include "cfg.h"
+#include "switchuser.h"
 #include "panel.h"
 
 using namespace std;
 
 Panel::Panel(Display* dpy, int scr, Window root, Cfg* config,
-			 const string& themedir, PanelType panel_mode) {
-	/* Set display */
-	Dpy = dpy;
-	Scr = scr;
-	Root = root;
-	cfg = config;
-	mode = panel_mode;
-
-	session_name = "";
-    session_exec = "";
+			 const string& themedir, PanelType panel_mode)
+	: cfg(config), mode(panel_mode), Dpy(dpy), Scr(scr), Root(root),
+	  session_name(""), session_exec("")
+{
 	if (mode == Mode_Lock) {
 		Win = root;
 		viewport = GetPrimaryViewport();
@@ -50,8 +52,7 @@ Panel::Panel(Display* dpy, int scr, Window root, Cfg* config,
 		gcv.graphics_exposures = False;
 		WinGC = XCreateGC(Dpy, Win, gcm, &gcv);
 		if (WinGC == 0) {
-			cerr << APPNAME
-				<< ": failed to create pixmap\n.";
+			cerr << APPNAME << ": failed to create pixmap\n.";
 			exit(ERR_EXIT);
 		}
 	}
@@ -207,7 +208,8 @@ Panel::Panel(Display* dpy, int scr, Window root, Cfg* config,
 	}
 }
 
-Panel::~Panel() {
+Panel::~Panel()
+{
 	Visual* visual = DefaultVisual(Dpy, Scr);
 	Colormap colormap = DefaultColormap(Dpy, Scr);
 
@@ -236,7 +238,8 @@ Panel::~Panel() {
 	delete image;
 }
 
-void Panel::OpenPanel() {
+void Panel::OpenPanel()
+{
 	/* Create window */
 	Win = XCreateSimpleWindow(Dpy, Root, X, Y,
 							  image->Width(),
@@ -259,14 +262,16 @@ void Panel::OpenPanel() {
 	XFlush(Dpy);
 }
 
-void Panel::ClosePanel() {
+void Panel::ClosePanel()
+{
 	XUngrabKeyboard(Dpy, CurrentTime);
 	XUnmapWindow(Dpy, Win);
 	XDestroyWindow(Dpy, Win);
 	XFlush(Dpy);
 }
 
-void Panel::ClearPanel() {
+void Panel::ClearPanel()
+{
 	session_name = "";
     session_exec = "";
 	Reset();
@@ -277,7 +282,8 @@ void Panel::ClearPanel() {
 	XFlush(Dpy);
 }
 
-void Panel::WrongPassword(int timeout) {
+void Panel::WrongPassword(int timeout)
+{
 	string message;
 	XGlyphInfo extents;
 	XWindowAttributes attributes;
@@ -322,7 +328,8 @@ void Panel::WrongPassword(int timeout) {
 	XftDrawDestroy(draw);
 }
 
-void Panel::Message(const string& text) {
+void Panel::Message(const string& text)
+{
 	string cfgX, cfgY;
 	XGlyphInfo extents;
 	XftDraw *draw;
@@ -359,7 +366,8 @@ void Panel::Message(const string& text) {
 	XftDrawDestroy(draw);
 }
 
-void Panel::Error(const string& text) {
+void Panel::Error(const string& text)
+{
 	ClosePanel();
 	Message(text);
 	sleep(ERROR_DURATION);
@@ -367,7 +375,8 @@ void Panel::Error(const string& text) {
 	ClearPanel();
 }
 
-unsigned long Panel::GetColor(const char* colorname) {
+unsigned long Panel::GetColor(const char* colorname)
+{
 	XColor color;
 	XWindowAttributes attributes;
 
@@ -386,7 +395,8 @@ unsigned long Panel::GetColor(const char* colorname) {
 	return color.pixel;
 }
 
-void Panel::Cursor(int visible) {
+void Panel::Cursor(int visible)
+{
 	const char* text = NULL;
 	int xx = 0, yy = 0, y2 = 0, cheight = 0;
 	const char* txth = "Wj"; /* used to get cursor height */
@@ -440,7 +450,8 @@ void Panel::Cursor(int visible) {
 	}
 }
 
-void Panel::EventHandler(const Panel::FieldType& curfield) {
+void Panel::EventHandler(const Panel::FieldType& curfield)
+{
 	XEvent event;
 	field = curfield;
 	bool loop = true;
@@ -472,7 +483,8 @@ void Panel::EventHandler(const Panel::FieldType& curfield) {
 	return;
 }
 
-void Panel::OnExpose(void) {
+void Panel::OnExpose(void)
+{
 	XftDraw *draw = XftDrawCreate(Dpy, Win,
 		DefaultVisual(Dpy, Scr), DefaultColormap(Dpy, Scr));
 
@@ -514,16 +526,17 @@ void Panel::OnExpose(void) {
 	ShowText();
 }
 
-void Panel::EraseLastChar(string &formerString) {
+void Panel::EraseLastChar(std::string &formerString)
+{
 	switch(field) {
-	case GET_NAME:
+	case Get_Name:
 		if (! NameBuffer.empty()) {
 			formerString=NameBuffer;
 			NameBuffer.erase(--NameBuffer.end());
 		}
 		break;
 
-	case GET_PASSWD:
+	case Get_Passwd:
 		if (!PasswdBuffer.empty()) {
 			formerString=HiddenPasswdBuffer;
 			PasswdBuffer.erase(--PasswdBuffer.end());
@@ -533,7 +546,8 @@ void Panel::EraseLastChar(string &formerString) {
 	}
 }
 
-bool Panel::OnKeyPress(XEvent& event) {
+bool Panel::OnKeyPress(XEvent& event)
+{
 	char ascii;
 	KeySym keysym;
 	XComposeStatus compstatus;
@@ -550,14 +564,16 @@ bool Panel::OnKeyPress(XEvent& event) {
 
 		case XK_F11:
 			/* Take a screenshot */
-			system(cfg->getOption("screenshot_cmd").c_str());
+			if ( system(cfg->getOption("screenshot_cmd").c_str()) < 0 )
+				logStream << APPNAME << ": screenshot_cmd failed" << endl;
 			return true;
 
 		case XK_Return:
 		case XK_KP_Enter:
 			if (field==Get_Name){
 				/* Don't allow an empty username */
-				if (NameBuffer.empty()) return true;
+				if (NameBuffer.empty())
+					return true;
 
 				if (NameBuffer==CONSOLE_STR){
 					action = Console;
@@ -575,7 +591,7 @@ bool Panel::OnKeyPress(XEvent& event) {
 					else
 						action = Lock;
 				}
-			};
+			}
 			return false;
 		default:
 			break;
@@ -614,26 +630,26 @@ bool Panel::OnKeyPress(XEvent& event) {
 		default:
 			if (isprint(ascii) && (keysym < XK_Shift_L || keysym > XK_Hyper_R)){
 				switch(field) {
-					case GET_NAME:
+					case Get_Name:
 						formerString=NameBuffer;
 						if (NameBuffer.length() < INPUT_MAXLENGTH_NAME-1){
 							NameBuffer.append(&ascii,1);
-						};
+						}
 						break;
-					case GET_PASSWD:
+					case Get_Passwd:
 						formerString=HiddenPasswdBuffer;
 						if (PasswdBuffer.length() < INPUT_MAXLENGTH_PASSWD-1){
 							PasswdBuffer.append(&ascii,1);
 							HiddenPasswdBuffer.append("*");
-						};
+						}
 					break;
-				};
+				}
 			}
 			else {	// *RP* I think this is to fix the fake bolding if the user presses TAB
 				return true; //nodraw if notchange
-			};
+			}
 			break;
-	};
+	}
 
 	XGlyphInfo extents;
 	XftDraw *draw = XftDrawCreate(Dpy, Win,
@@ -686,13 +702,13 @@ bool Panel::OnKeyPress(XEvent& event) {
 }
 
 /* Draw welcome and "enter username" message */
-void Panel::ShowText(){
+void Panel::ShowText()
+{
 	string cfgX, cfgY;
 	XGlyphInfo extents;
 
-	bool singleInputMode =
-	input_name_x == input_pass_x &&
-	input_name_y == input_pass_y;
+	bool singleInputMode = ( input_name_x == input_pass_x
+			    && input_name_y == input_pass_y );
 
 	XftDraw *draw = XftDrawCreate(Dpy, Win,
 		  DefaultVisual(Dpy, Scr), DefaultColormap(Dpy, Scr));
@@ -758,12 +774,14 @@ void Panel::ShowText(){
 	}
 }
 
-string Panel::getSession() {
+string Panel::getSession()
+{
 	return session_exec;
 }
 
 /* choose next available session type */
-void Panel::SwitchSession() {
+void Panel::SwitchSession()
+{
         pair<string,string> ses = cfg->nextSession();
         session_name = ses.first;
         session_exec = ses.second;
@@ -773,7 +791,8 @@ void Panel::SwitchSession() {
  }
 
 /* Display session type on the screen */
-void Panel::ShowSession() {
+void Panel::ShowSession()
+{
 	string msg_x, msg_y;
 	XClearWindow(Dpy, Root);
 	string currsession = cfg->getOption("session_msg") + " " + session_name;
@@ -828,25 +847,30 @@ void Panel::SlimDrawString8(XftDraw *d, XftColor *color, XftFont *font,
 		str.length());
 }
 
-Panel::ActionType Panel::getAction(void) const{
+Panel::ActionType Panel::getAction(void) const
+{
 	return action;
 }
 
-void Panel::Reset(void){
+void Panel::Reset(void)
+{
 	ResetName();
 	ResetPasswd();
 }
 
-void Panel::ResetName(void){
+void Panel::ResetName(void)
+{
 	NameBuffer.clear();
 }
 
-void Panel::ResetPasswd(void){
+void Panel::ResetPasswd(void)
+{
 	PasswdBuffer.clear();
 	HiddenPasswdBuffer.clear();
 }
 
-void Panel::SetName(const string& name){
+void Panel::SetName(const string& name)
+{
 	NameBuffer=name;
 	if (mode == Mode_DM)
 		action = Login;
@@ -854,15 +878,18 @@ void Panel::SetName(const string& name){
 		action = Lock;
 }
 
-const string& Panel::GetName(void) const{
+const string& Panel::GetName(void) const
+{
 	return NameBuffer;
 }
 
-const string& Panel::GetPasswd(void) const{
+const string& Panel::GetPasswd(void) const
+{
 	return PasswdBuffer;
 }
 
-Rectangle Panel::GetPrimaryViewport() {
+Rectangle Panel::GetPrimaryViewport()
+{
 	Rectangle fallback;
 	Rectangle result;
 
@@ -925,7 +952,8 @@ Rectangle Panel::GetPrimaryViewport() {
 	return result;
 }
 
-void Panel::ApplyBackground(Rectangle rect) {
+void Panel::ApplyBackground(Rectangle rect)
+{
 	int ret = 0;
 
 	if (rect.is_empty()) {

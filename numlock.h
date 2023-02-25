@@ -16,8 +16,8 @@
 #include <X11/XKBlib.h>
 #include <X11/keysym.h>
 
-class NumLock {
-
+class NumLock
+{
 public:
 	NumLock();
 	static void setOn(Display *dpy);

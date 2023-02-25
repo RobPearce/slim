@@ -15,15 +15,18 @@
 #include <ck-connector.h>
 #include <dbus/dbus.h>
 
-namespace Ck {
-	class Exception {
+namespace Ck
+{
+	class Exception
+	{
 	public:
 		std::string func;
 		std::string errstr;
 		Exception(const std::string &func, const std::string &errstr);
 	};
 
-	class Session {
+	class Session
+	{
 	private:
 		CkConnector *ckc;
 		DBusError error;
@@ -36,8 +39,8 @@ namespace Ck {
 		void open_session(const std::string &display, uid_t uid);
 		void close_session();
 
-	Session();
-	~Session();
+		Session();
+		~Session();
 	};
 }
 

@@ -24,8 +24,7 @@
 #include <jpeglib.h>
 #include "const.h"
 
-int
-read_jpeg(const char *filename, int *width, int *height, unsigned char **rgb)
+int read_jpeg(const char *filename, int *width, int *height, unsigned char **rgb)
 {
 	int ret = 0;
 	struct jpeg_decompress_struct cinfo;

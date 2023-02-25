@@ -21,6 +21,8 @@
 
 using namespace std;
 
+#include "log.h"
+#include "const.h"
 #include "image.h"
 
 extern "C" {
@@ -28,11 +30,16 @@ extern "C" {
 	#include <png.h>
 }
 
-Image::Image() : width(0), height(0), area(0),
-rgb_data(NULL), png_alpha(NULL), quality_(80) {}
+Image::Image()
+	: width(0), height(0), area(0), rgb_data(NULL), png_alpha(NULL),
+	  quality_(80)
+{
+}
 
-Image::Image(const int w, const int h, const unsigned char *rgb, const unsigned char *alpha) :
-width(w), height(h), area(w*h), quality_(80) {
+Image::Image ( const int w, const int h, const unsigned char *rgb,
+		const unsigned char *alpha)
+	: width(w), height(h), area(w*h), quality_(80)
+{
 	width = w;
 	height = h;
 	area = w * h;
@@ -48,16 +55,18 @@ width(w), height(h), area(w*h), quality_(80) {
 	}
 }
 
-Image::~Image() {
+Image::~Image()
+{
 	free(rgb_data);
 	free(png_alpha);
 }
 
-bool
-Image::Read(const char *filename) {
+bool Image::Read(const char *filename)
+{
 	char buf[4];
 	unsigned char *ubuf = (unsigned char *) buf;
-	int success = 0;
+	int success;
+	int nr;
 
 	FILE *file;
 	file = fopen(filename, "rb");
@@ -66,8 +75,10 @@ Image::Read(const char *filename) {
 
 	/* see what kind of file we have */
 
-	fread(buf, 1, 4, file);
+	nr = fread(buf, 1, 4, file);
 	fclose(file);
+	if ( nr < 4 )
+		return false;	// Failed to read 4 bytes; probably empty file
 
 	if ((ubuf[0] == 0x89) && !strncmp("PNG", buf+1, 3))
 		success = readPng(filename, &width, &height, &rgb_data, &png_alpha);
@@ -80,8 +91,8 @@ Image::Read(const char *filename) {
 	return(success == 1);
 }
 
-void
-Image::Reduce(const int factor) {
+void Image::Reduce(const int factor)
+{
 	if (factor < 1)
 		return;
 
@@ -129,8 +140,8 @@ Image::Reduce(const int factor) {
 	area = w * h;
 }
 
-void
-Image::Resize(const int w, const int h) {
+void Image::Resize(const int w, const int h)
+{
 
 	if (width==w && height==h){
 		return;
@@ -173,13 +184,13 @@ Image::Resize(const int w, const int h) {
 /* Find the color of the desired point using bilinear interpolation. */
 /* Assume the array indices refer to the denter of the pixel, so each */
 /* pixel has corners at (i - 0.5, j - 0.5) and (i + 0.5, j + 0.5) */
-void
-Image::getPixel(double x, double y, unsigned char *pixel) {
+void Image::getPixel(double x, double y, unsigned char *pixel)
+{
 	getPixel(x, y, pixel, NULL);
 }
 
-void
-Image::getPixel(double x, double y, unsigned char *pixel, unsigned char *alpha) {
+void Image::getPixel(double x, double y, unsigned char *pixel, unsigned char *alpha)
+{
 	if (x < -0.5)
 		x = -0.5;
 	if (x >= width - 0.5)
@@ -242,7 +253,8 @@ Image::getPixel(double x, double y, unsigned char *pixel, unsigned char *alpha) 
  * The images is merged on position (x, y) on the
  * background, the background must contain the image.
  */
-void Image::Merge(Image* background, const int x, const int y) {
+void Image::Merge(Image* background, const int x, const int y)
+{
 
 	if (x + width > background->Width()|| y + height > background->Height())
 		return;
@@ -283,7 +295,6 @@ void Image::Merge(Image* background, const int x, const int y) {
 	free(png_alpha);
 	rgb_data = new_rgb;
 	png_alpha = NULL;
-
 }
 
 /* Merge the image with a background, taking care of the
@@ -344,7 +355,8 @@ void Image::Merge_non_crop(Image* background, const int x, const int y)
  * The new dimensions should be > of the current ones.
  * Note that this flattens image (alpha removed)
  */
-void Image::Tile(const int w, const int h) {
+void Image::Tile(const int w, const int h)
+{
 
 	if (w < width || h < height)
 		return;
@@ -387,12 +399,12 @@ void Image::Tile(const int w, const int h) {
 	height = newheight;
 	area = width * height;
 	Crop(0,0,w,h);
-
 }
 
 /* Crop the image
  */
-void Image::Crop(const int x, const int y, const int w, const int h) {
+void Image::Crop(const int x, const int y, const int w, const int h)
+{
 
 	if (x+w > width || y+h > height) {
 		return;
@@ -433,14 +445,13 @@ void Image::Crop(const int x, const int y, const int w, const int h) {
 	width = w;
 	height = h;
 	area = w * h;
-
-
 }
 
 /* Center the image in a rectangle of given width and height.
  * Fills the remaining space (if any) with the hex color
  */
-void Image::Center(const int w, const int h, const char *hex) {
+void Image::Center(const int w, const int h, const char *hex)
+{
 
 	unsigned long packed_rgb;
 	sscanf(hex, "%lx", &packed_rgb);
@@ -489,7 +500,6 @@ void Image::Center(const int w, const int h, const char *hex) {
 					}
 					opos++;
 				}
-
 			}
 		}
 	} else {
@@ -503,7 +513,6 @@ void Image::Center(const int w, const int h, const char *hex) {
 					}
 					opos++;
 				}
-
 			}
 		}
 	}
@@ -514,13 +523,13 @@ void Image::Center(const int w, const int h, const char *hex) {
 	png_alpha = NULL;
 	width = w;
 	height = h;
-
 }
 
 /* Fill the image with the given color and adjust its dimensions
  * to passed values.
  */
-void Image::Plain(const int w, const int h, const char *hex) {
+void Image::Plain(const int w, const int h, const char *hex)
+{
 
 	unsigned long packed_rgb;
 	sscanf(hex, "%lx", &packed_rgb);
@@ -547,10 +556,10 @@ void Image::Plain(const int w, const int h, const char *hex) {
 	height = h;
 }
 
-void
-Image::computeShift(unsigned long mask,
+void Image::computeShift(unsigned long mask,
 					unsigned char &left_shift,
-					unsigned char &right_shift) {
+					unsigned char &right_shift)
+{
 	left_shift = 0;
 	right_shift = 8;
 	if (mask != 0) {
@@ -565,16 +574,15 @@ Image::computeShift(unsigned long mask,
 	}
 }
 
-Pixmap
-Image::createPixmap(Display* dpy, int scr, Window win) {
+Pixmap Image::createPixmap(Display* dpy, int scr, Window win)
+{
 	int i, j;   /* loop variables */
 
 	const int depth = DefaultDepth(dpy, scr);
 	Visual *visual = DefaultVisual(dpy, scr);
 	Colormap colormap = DefaultColormap(dpy, scr);
 
-	Pixmap tmp = XCreatePixmap(dpy, win, width, height,
-							   depth);
+	Pixmap tmp = XCreatePixmap(dpy, win, width, height, depth);
 
 	char *pixmap_data = NULL;
 	switch (depth) {
@@ -692,7 +700,7 @@ Image::createPixmap(Display* dpy, int scr, Window win) {
 		}
 		break;
 	default: {
-			logStream << "Login.app: could not load image" << endl;
+			logStream << APPNAME << ": could not load image" << endl;
 			return(tmp);
 		}
 	}
@@ -713,8 +721,7 @@ Image::createPixmap(Display* dpy, int scr, Window win) {
 	return(tmp);
 }
 
-int
-Image::readJpeg(const char *filename, int *width, int *height,
+int Image::readJpeg(const char *filename, int *width, int *height,
 				unsigned char **rgb)
 {
 	int ret = 0;
@@ -735,7 +742,7 @@ Image::readJpeg(const char *filename, int *width, int *height,
 	jpeg_start_decompress(&cinfo);
 
 	/* Prevent against integer overflow */
-	if(cinfo.output_width >= MAX_DIMENSION
+	if ( cinfo.output_width >= MAX_DIMENSION
 	   || cinfo.output_height >= MAX_DIMENSION)
 	{
 		logStream << APPNAME << "Unreasonable dimension found in file: "
@@ -796,8 +803,7 @@ close_file:
 	return(ret);
 }
 
-int
-Image::readPng(const char *filename, int *width, int *height,
+int Image::readPng(const char *filename, int *width, int *height,
 			   unsigned char **rgb, unsigned char **alpha)
 {
 	int ret = 0;

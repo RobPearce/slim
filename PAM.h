@@ -16,8 +16,10 @@
 #include <security/pam_misc.h>
 #endif
 
-namespace PAM {
-	class Exception {
+namespace PAM
+{
+	class Exception
+	{
 	public:
 		int errnum;
 		std::string errstr;
@@ -28,14 +30,16 @@ namespace PAM {
 		virtual ~Exception(void);
 	};
 
-	class Auth_Exception: public Exception {
+	class Auth_Exception: public Exception
+	{
 	public:
 		Auth_Exception(pam_handle_t* _pam_handle,
 					   const std::string& _func_name,
 					   int _errnum);
 	};
 
-	class Cred_Exception: public Exception {
+	class Cred_Exception: public Exception
+	{
 	public:
 		Cred_Exception(pam_handle_t* _pam_handle,
 					   const std::string& _func_name,
@@ -43,13 +47,15 @@ namespace PAM {
 	};
 
 
-	class Authenticator {
+	class Authenticator
+	{
 	private:
 		struct pam_conv pam_conversation;
 		pam_handle_t* pam_handle;
 		int last_result;
 
 		int _end(void);
+
 	public:
 		typedef int (conversation)(int num_msg,
 						   const struct pam_message **msg,

@@ -2,6 +2,7 @@
  *  Copyright (C) 1997, 1998 Per Liden
  *  Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
  *  Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
+ *  Copyright (C) 2022 Rob Pearce <slim@flitspace.org.uk>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -12,6 +13,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <pwd.h>			// for getpwnam etc.
 #include <fcntl.h>
 #include <stdint.h>
 #include <cstring>
@@ -22,9 +24,12 @@
 #include <vector>
 #include <algorithm>
 
-#include "app.h"
+#include "const.h"
+#include "log.h"
 #include "numlock.h"
+#include "switchuser.h"
 #include "util.h"
+#include "app.h"
 
 #ifdef HAVE_SHADOW
 #include <shadow.h>
@@ -90,7 +95,8 @@ int conv(int num_msg, const struct pam_message **msg,
 				logStream << APPNAME << ": " << msg[i]->msg << endl;
 				break;
 		}
-		if (result!=PAM_SUCCESS) break;
+		if (result != PAM_SUCCESS)
+			break;
 	}
 
 	if (result != PAM_SUCCESS) {
@@ -132,37 +138,30 @@ void User1Signal(int sig)
 	signal(sig, User1Signal);
 }
 
+App::App(int argc, char** argv)
+	: Dpy(NULL), ServerPID(-1), serverStarted(false),
 #ifdef USE_PAM
-App::App(int argc, char** argv)
-  : pam(conv, static_cast<void*>(&LoginPanel)),
-#else
-App::App(int argc, char** argv)
-  :
+	  pam(conv, static_cast<void*>(&LoginPanel)),
 #endif
-	mcookiesize(32)		/* Must be divisible by 4 */
+	  firstlogin(true), daemonmode(false), force_nodaemon(false),
+	  testing(false),
+#ifdef USE_CONSOLEKIT
+	  consolekit_support_enabled(true),
+#endif
+	  mcookiesize(32)		/* Must be divisible by 4 */
 {
 	int tmp;
-	ServerPID = -1;
-	testing = false;
-	serverStarted = false;
 	mcookie = string(App::mcookiesize, 'a');
-	daemonmode = false;
-	force_nodaemon = false;
-	firstlogin = true;
-#ifdef USE_CONSOLEKIT
-	consolekit_support_enabled = true;
-#endif
-	Dpy = NULL;
-
+	
 	/* Parse command line
 	   Note: we force a option for nodaemon switch to handle "-nodaemon" */
-	while((tmp = getopt(argc, argv, "vhsp:n:d?")) != EOF) {
+	while ((tmp = getopt(argc, argv, "vhsp:n:d?")) != EOF) {
 		switch (tmp) {
 		case 'p':	/* Test theme */
 			testtheme = optarg;
 			testing = true;
 			if (testtheme == NULL) {
-				logStream << "The -p option requires an argument" << endl;
+				cerr << "The -p option requires an argument" << endl;
 				exit(ERR_EXIT);
 			}
 			break;
@@ -183,7 +182,7 @@ App::App(int argc, char** argv)
 			break;
 #endif
 		case '?':	/* Illegal */
-			logStream << endl;
+			std::cout << endl;
 		case 'h':   /* Help */
 			std::cout << "usage:  " << APPNAME << " [option ...]" << endl
 			<< "options:" << endl
@@ -314,7 +313,8 @@ void App::Run()
 	if ((Dpy = XOpenDisplay(DisplayName)) == 0) {
 		logStream << APPNAME << ": could not open display '"
 			 << DisplayName << "'" << endl;
-		if (!testing) StopServer();
+		if (!testing)
+			StopServer();
 		exit(ERR_EXIT);
 	}
 
@@ -402,7 +402,7 @@ void App::Run()
 		{
 			// Removed by Gentoo "session-chooser" patch
 			//LoginPanel->SwitchSession();
-        	}
+		}
 
 		if (!AuthenticateUser(focuspass && firstloop))
 		{
@@ -599,7 +599,8 @@ void App::Login()
 #ifdef USE_PAM
 	/* Setup the PAM environment */
 	try{
-		if (term) pam.setenv("TERM", term);
+		if (term)
+			pam.setenv("TERM", term);
 		pam.setenv("HOME", pw->pw_dir);
 		pam.setenv("PWD", pw->pw_dir);
 		pam.setenv("SHELL", pw->pw_shell);
@@ -643,14 +644,15 @@ void App::Login()
 
 			/* Grow the copy of the environment for the session cookie */
 			int n;
-			for (n = 0; child_env[n] != NULL ; n++);
+			for (n = 0; child_env[n] != NULL ; n++)
+				;
 
 			n++;
 
 			child_env = static_cast<char**>(malloc(sizeof(char*)*(n+1)));
 			memcpy(child_env, old_env, sizeof(char*)*n);
 			child_env[n - 1] = StrConcat("XDG_SESSION_COOKIE=", ck.get_xdg_session_cookie());
-			child_env[n] = 0;
+			child_env[n] = NULL;
 		}
 # endif /* USE_CONSOLEKIT */
 #else
@@ -662,7 +664,8 @@ void App::Login()
 # endif /* USE_CONSOLEKIT */
 		char** child_env = static_cast<char**>(malloc(sizeof(char*)*Num_Of_Variables));
 		int n = 0;
-		if (term) child_env[n++]=StrConcat("TERM=", term);
+		if (term)
+			child_env[n++]=StrConcat("TERM=", term);
 		child_env[n++]=StrConcat("HOME=", pw->pw_dir);
 		child_env[n++]=StrConcat("PWD=", pw->pw_dir);
 		child_env[n++]=StrConcat("SHELL=", pw->pw_shell);
@@ -689,7 +692,8 @@ void App::Login()
 		string sessStart = cfg->getOption("sessionstart_cmd");
 		if (sessStart != "") {
 			replaceVariables(sessStart, USER_VAR, pw->pw_name);
-			system(sessStart.c_str());
+			if ( system(sessStart.c_str()) < 0 )
+				logStream << APPNAME << ": Failed to run sessionstart_cmd" << endl;
 		}
 		Su.Login(loginCommand.c_str(), mcookie.c_str());
 		_exit(OK_EXIT);
@@ -707,14 +711,19 @@ void App::Login()
 		if (wpid == ServerPID)
 			xioerror(Dpy);	/* Server died, simulate IO error */
 	}
+#ifndef XNEST_DEBUG
+	/* Re-activate log file */
+	OpenLog();
+#endif
 	if (WIFEXITED(status) && WEXITSTATUS(status)) {
 		LoginPanel->Message("Failed to execute login command");
 		sleep(3);
 	} else {
-		 string sessStop = cfg->getOption("sessionstop_cmd");
-		 if (sessStop != "") {
+		string sessStop = cfg->getOption("sessionstop_cmd");
+		if (sessStop != "") {
 			replaceVariables(sessStop, USER_VAR, pw->pw_name);
-			system(sessStop.c_str());
+			if ( system(sessStop.c_str()) < 0 )
+				logStream << APPNAME << "Session stop command failed" << endl;
 		}
 	}
 
@@ -752,9 +761,7 @@ void App::Login()
 	HideCursor();
 
 #ifndef XNEST_DEBUG
-	/* Re-activate log file */
-	OpenLog();
-	RestartServer();
+	RestartServer();	/// @bug recursive call!
 #endif
 
 }
@@ -777,7 +784,8 @@ void App::Reboot()
 	/* Stop server and reboot */
 	StopServer();
 	RemoveLock();
-	system(cfg->getOption("reboot_cmd").c_str());
+	if ( system(cfg->getOption("reboot_cmd").c_str()) < 0 )
+		logStream << APPNAME << ": Failed to execute reboot command" << endl;
 	exit(OK_EXIT);
 }
 
@@ -800,14 +808,16 @@ void App::Halt()
 	/* Stop server and halt */
 	StopServer();
 	RemoveLock();
-	system(cfg->getOption("halt_cmd").c_str());
+	if ( system(cfg->getOption("halt_cmd").c_str()) < 0 )
+		logStream << APPNAME << ": Failed to execute halt command" << endl;
 	exit(OK_EXIT);
 }
 
 void App::Suspend()
 {
 	sleep(1);
-	system(cfg->getOption("suspend_cmd").c_str());
+	if ( system(cfg->getOption("suspend_cmd").c_str() ) < 0 )
+		logStream << APPNAME << ": Failed to execute suspend command" << endl;
 }
 
 
@@ -824,7 +834,8 @@ void App::Console()
 	const char* cmd = cfg->getOption("console_cmd").c_str();
 	char *tmp = new char[strlen(cmd) + 60];
 	sprintf(tmp, cmd, width, height, posx, posy, fontx, fonty);
-	system(tmp);
+	if ( system(tmp) < 0 )
+		logStream << APPNAME << ": Failed to fork console app '" << cmd << "'" << endl;
 	delete [] tmp;
 }
 
@@ -1125,7 +1136,6 @@ void App::blankScreen()
 				   XHeightOfScreen(ScreenOfDisplay(Dpy, Scr)));
 	XFlush(Dpy);
 	XFreeGC(Dpy, gc);
-
 }
 
 void App::setBackground(const string& themedir)
@@ -1230,7 +1240,7 @@ bool App::isServerStarted()
 void App::OpenLog()
 {
 	if ( !logStream.openLog( cfg->getOption("logfile").c_str() ) ) {
-		logStream <<  APPNAME << ": Could not accesss log file: " << cfg->getOption("logfile") << endl;
+		cerr <<  APPNAME << ": Could not accesss log file: " << cfg->getOption("logfile") << endl;
 		RemoveLock();
 		exit(ERR_EXIT);
 	}

@@ -1,5 +1,6 @@
 /* SLiM - Simple Login Manager
  * Copyright (C) 2007 Martin Parm
+ * Copyright (C) 2022 Rob Pearce <slim@flitspace.org.uk>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -11,26 +12,28 @@
 #include <iostream>
 #include "PAM.h"
 
-namespace PAM {
+namespace PAM
+{
 	Exception::Exception(pam_handle_t* _pam_handle,
 					const std::string& _func_name,
-					int _errnum):
-		errnum(_errnum),
-		errstr(pam_strerror(_pam_handle, _errnum)),
-		func_name(_func_name)
-		{}
+					int _errnum)
+		: errnum(_errnum), errstr(pam_strerror(_pam_handle, _errnum)),
+		  func_name(_func_name)
+	{}
 
 	Exception::~Exception(void) {}
 
 	Auth_Exception::Auth_Exception(pam_handle_t* _pam_handle,
 					const std::string& _func_name,
-					int _errnum):
-		Exception(_pam_handle, _func_name, _errnum) {}
+					int _errnum)
+		: Exception(_pam_handle, _func_name, _errnum)
+	{}
 
 	Cred_Exception::Cred_Exception(pam_handle_t* _pam_handle,
 					const std::string& _func_name,
-					int _errnum):
-		Exception(_pam_handle, _func_name, _errnum) {}
+					int _errnum)
+		: Exception(_pam_handle, _func_name, _errnum)
+	{}
 
 	int Authenticator::_end (void)
 	{
@@ -39,9 +42,8 @@ namespace PAM {
 		return result;
 	}
 
-	Authenticator::Authenticator(conversation* conv, void* data):
-		pam_handle(0),
-		last_result(PAM_SUCCESS)
+	Authenticator::Authenticator(conversation* conv, void* data)
+		: pam_handle(0), last_result(PAM_SUCCESS)
 	{
 		pam_conversation.conv=conv;
 		pam_conversation.appdata_ptr=data;
