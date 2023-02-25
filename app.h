@@ -77,46 +77,42 @@ private:
 	int WaitForServer();
 
 	/* Private data */
-	Window Root;
-	Display *Dpy;
-	int Scr;
-	Panel *LoginPanel;
-	int ServerPID;
-	const char *DisplayName;
-	bool serverStarted;
+	Window Root;	///< The root window of the default screen, on which to draw
+	Display *Dpy;	///< Connection to the X-server
+	int Scr;		///< Which "screen" to use (which will be the default one)
+	Panel *LoginPanel;	///< The panel we display and interact through
+	int ServerPID;	///< Process ID of the X-server we launched
+	const char *DisplayName;	///< The display to request, usually ":0.0"
+	bool serverStarted;	///< Whether we (think we) have started an X server
 
 #ifdef USE_PAM
-	PAM::Authenticator pam;
+	PAM::Authenticator pam;	///< Interface to the PAM authentication library
 #endif
 #ifdef USE_CONSOLEKIT
-	Ck::Session ck;
+	Ck::Session ck;		///< Interface to ConsoleKit, if used
 #endif
 
 	/* Options */
-	char *DispName;
-
-	Cfg *cfg;
-
-	Pixmap BackgroundPixmap;
+	Cfg *cfg;		///< Collection of options from the configuration file
 
 	void blankScreen();
-	Image *image;
-	Atom BackgroundPixmapId;
+
+	Atom BackgroundPixmapId;	// from XInternAtom -- does it need to be a member var?
 	void setBackground(const std::string &themedir);
 
-	bool firstlogin;
-	bool daemonmode;
-	bool force_nodaemon;
+	bool firstlogin;	///< Whether to exhibit first login behaviour, or repeat
+	bool daemonmode;	///< Are we running as a daemon?
+	bool force_nodaemon;	///< Are we forced NOT to be a daemon?
 	/* For testing themes */
-	char *testtheme;
-	bool testing;
+	char *testtheme;	///< Name of the theme to test, from command line
+	bool testing;		///< Whether we're running in theme testing mode
 
 #ifdef USE_CONSOLEKIT
-	bool consolekit_support_enabled;
+	bool consolekit_support_enabled;	///< Whether to use ConsoleKit (not compatible with systemd)
 #endif
 
-	std::string themeName;
-	std::string mcookie;
+	std::string themeName;	///< Name of the theme in use
+	std::string mcookie;	///< Randomly generated X auth cookie
 
 	const int mcookiesize;
 };

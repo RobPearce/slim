@@ -76,10 +76,8 @@ public:
 	~Panel();
 	void OpenPanel();
 	void ClosePanel();
-	void ClearPanel();
 	void WrongPassword(int timeout);
 	void Message(const std::string &text);
-	void Error(const std::string &text);
 	void EventHandler(const FieldType &curfield);
 	std::string getSession();
 	ActionType getAction(void) const;
@@ -140,6 +138,7 @@ private:
 	ActionType action;
 	FieldType field;
 	//Pixmap   background;
+	XGlyphInfo MsgExtents;
 	
 	/* Username/Password */
 	std::string NameBuffer;

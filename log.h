@@ -14,27 +14,30 @@ using namespace std;
 class LogUnit
 {
 	ofstream logFile;
+	ostream * logOut;
 public:
 	bool openLog(const char * filename);
 	void closeLog();
+
+	LogUnit();
 
 	~LogUnit() { closeLog(); }
 
 	template<typename Type> LogUnit & operator<<(const Type & text)
 	{
-		logFile << text; logFile.flush();
+		*logOut << text; logOut->flush();
 		return *this;
 	}
 
 	LogUnit & operator<<(ostream & (*fp)(ostream&))
 	{
-		logFile << fp; logFile.flush();
+		*logOut << fp; logOut->flush();
 		return *this;
 	}
 
 	LogUnit & operator<<(ios_base & (*fp)(ios_base&))
 	{
-		logFile << fp; logFile.flush();
+		*logOut << fp; logOut->flush();
 		return *this;
 	}
 };

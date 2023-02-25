@@ -1,4 +1,4 @@
-.TH slim 1 "January 29, 2022" "" ""
+.TH slim 1 "November 14, 2022" "" ""
 .SH NAME
 \fBslim \fP- Simple LogIn Manager
 \fB
@@ -16,8 +16,8 @@ session style.
 .SH OPTIONS
 .TP
 .B
-\fB-d\fP
-run as a daemon
+\fB-c\fP /path/to/config
+select a non-standard configuration file instead of /etc/slim.conf
 .TP
 .B
 \fB-n\fP
@@ -50,8 +50,9 @@ run \fBslim\fP in daemon mode
 \fBslim\fP \fB-p\fP /usr/share/slim/themes/default
 preview of the default theme
 .SH STARTING SLIM AT BOOT
-Please refer to documentation of your Operating System to make \fBslim\fP
-automatically startup after the system boots.
+Please refer to the documentation of your Operating System to make \fBslim\fP
+automatically startup after the system boots. In particular, the method is
+very different between SysV, OpenRC and systemd init processes.
 .SH CONFIGURATION
 Global configuration is stored in the /etc/slim.conf file. See the comments
 inside the file for a detailed explanation of the \fIoptions\fP.
@@ -94,6 +95,11 @@ executes a custom command (by default takes a screenshot)
 .B
 F1
 choose session type from session list.
+.SH BUGS
+On login, \fBslim\fP relies on external tools, normally \fBsessreg\fP, to 
+provide the registration of the user's session. There seems to be a bug in 
+the common sessreg implementation which causes the registration to fail if 
+a user logs out then rapidly logs back in.
 .SH AUTHORS 
 Simone Rota <sip@varlock.com>
 .PP

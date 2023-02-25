@@ -13,6 +13,12 @@
 #include "const.h"
 #include "log.h"
 #include <iostream>
+#include <cstring>
+
+LogUnit::LogUnit()
+{
+	logOut = &cerr;
+}
 
 bool LogUnit::openLog(const char * filename)
 {
@@ -22,9 +28,22 @@ bool LogUnit::openLog(const char * filename)
 			<< endl;
 		logFile.close();
 	}
-	logFile.open(filename, ios_base::app);
 
-	return !(logFile.fail());
+	// cerr is the default
+	if ( ( strcmp(filename, "/dev/stderr") == 0 )
+	  || ( strcmp(filename, "stderr") == 0 ) )
+	{
+		logOut = &cerr;
+		return true;
+	}
+
+	logFile.open(filename, ios_base::out|ios_base::app);
+	if ( logFile )
+	{
+		logOut = &logFile;
+		return true;
+	}
+	return false;
 }
 
 void LogUnit::closeLog()

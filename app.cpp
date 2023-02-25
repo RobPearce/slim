@@ -48,14 +48,17 @@ int conv(int num_msg, const struct pam_message **msg,
 	int result = PAM_SUCCESS;
 	int i;
 
-	for (i = 0; i < num_msg; i++) {
+	for (i = 0; i < num_msg; i++)
+	{
 		(*resp)[i].resp = 0;
 		(*resp)[i].resp_retcode = 0;
-		switch (msg[i]->msg_style) {
+		switch (msg[i]->msg_style)
+		{
 			case PAM_PROMPT_ECHO_ON:
 				/* We assume PAM is asking for the username */
 				panel->EventHandler(Panel::Get_Name);
-				switch (panel->getAction()) {
+				switch (panel->getAction())
+				{
 					case Panel::Suspend:
 					case Panel::Halt:
 					case Panel::Reboot:
@@ -74,7 +77,8 @@ int conv(int num_msg, const struct pam_message **msg,
 
 			case PAM_PROMPT_ECHO_OFF:
 				/* We assume PAM is asking for the password */
-				switch (panel->getAction()) {
+				switch (panel->getAction())
+				{
 					case Panel::Console:
 					case Panel::Exit:
 						/* We should leave now! */
@@ -91,7 +95,9 @@ int conv(int num_msg, const struct pam_message **msg,
 			case PAM_ERROR_MSG:
 			case PAM_TEXT_INFO:
 				/* We simply write these to the log
-				   TODO: Maybe we should simply ignore them */
+				   TODO: Maybe we should show them. In particular, if you 
+				         have a fingerprint reader, PAM passes instructions
+				         in PAM_TEXT_INFO messages */
 				logStream << APPNAME << ": " << msg[i]->msg << endl;
 				break;
 		}
@@ -99,8 +105,10 @@ int conv(int num_msg, const struct pam_message **msg,
 			break;
 	}
 
-	if (result != PAM_SUCCESS) {
-		for (i = 0; i < num_msg; i++) {
+	if (result != PAM_SUCCESS)
+	{
+		for (i = 0; i < num_msg; i++)
+		{
 			if ((*resp)[i].resp == 0)
 				continue;
 			free((*resp)[i].resp);
@@ -133,8 +141,10 @@ void CatchSignal(int sig)
 	exit(ERR_EXIT);
 }
 
+static volatile bool got_sigusr1 = false;
 void User1Signal(int sig)
 {
+	got_sigusr1 = true;
 	signal(sig, User1Signal);
 }
 
@@ -143,6 +153,7 @@ App::App(int argc, char** argv)
 #ifdef USE_PAM
 	  pam(conv, static_cast<void*>(&LoginPanel)),
 #endif
+	  cfg(0),
 	  firstlogin(true), daemonmode(false), force_nodaemon(false),
 	  testing(false),
 #ifdef USE_CONSOLEKIT
@@ -155,37 +166,61 @@ App::App(int argc, char** argv)
 	
 	/* Parse command line
 	   Note: we force a option for nodaemon switch to handle "-nodaemon" */
-	while ((tmp = getopt(argc, argv, "vhsp:n:d?")) != EOF) {
-		switch (tmp) {
+	while ((tmp = getopt(argc, argv, "c:vhsp:n:d?")) != EOF)
+	{
+		switch (tmp)
+		{
+		case 'c': /* Config */
+			if (optarg == NULL)
+			{
+				cerr << "The -c option requires an argument" << endl;
+				exit(ERR_EXIT);
+			}
+			if ( cfg != 0 )
+			{
+				cerr << "The -c option can only be given once" << endl;
+				exit(ERR_EXIT);
+			}
+			cfg = new Cfg;
+			cfg->readConf(optarg);
+			break;
+
 		case 'p':	/* Test theme */
 			testtheme = optarg;
 			testing = true;
-			if (testtheme == NULL) {
+			if (testtheme == NULL)
+			{
 				cerr << "The -p option requires an argument" << endl;
 				exit(ERR_EXIT);
 			}
 			break;
+
 		case 'd':	/* Daemon mode */
 			daemonmode = true;
 			break;
+
 		case 'n':	/* Daemon mode */
 			daemonmode = false;
 			force_nodaemon = true;
 			break;
+
 		case 'v':	/* Version */
 			std::cout << APPNAME << " version " << VERSION << endl;
 			exit(OK_EXIT);
 			break;
+
 #ifdef USE_CONSOLEKIT
 		case 's':	/* Disable consolekit support */
 			consolekit_support_enabled = false;
 			break;
 #endif
+
 		case '?':	/* Illegal */
 			std::cout << endl;
 		case 'h':   /* Help */
 			std::cout << "usage:  " << APPNAME << " [option ...]" << endl
 			<< "options:" << endl
+			<< "	-c /path/to/config: select configuration file" << endl
 			<< "	-d: daemon mode" << endl
 			<< "	-n: no-daemon mode" << endl
 			<< "	-v: show version" << endl
@@ -198,7 +233,8 @@ App::App(int argc, char** argv)
 		}
 	}
 #ifndef XNEST_DEBUG
-	if (getuid() != 0 && !testing) {
+	if (getuid() != 0 && !testing)
+	{
 		logStream << APPNAME << ": only root can run this program" << endl;
 		exit(ERR_EXIT);
 	}
@@ -212,29 +248,38 @@ void App::Run()
 
 #ifdef XNEST_DEBUG
 	char* p = getenv("DISPLAY");
-	if (p && p[0]) {
+	if (p && p[0])
+	{
 		DisplayName = p;
 		cout << "Using display name " << DisplayName << endl;
 	}
 #endif
 
 	/* Read configuration and theme */
-	cfg = new Cfg;
-	cfg->readConf(CFGFILE);
+	if ( cfg == 0 )
+	{
+		cfg = new Cfg;
+		cfg->readConf(CFGFILE);
+	}
 	string themebase = "";
 	string themefile = "";
 	string themedir = "";
 	themeName = "";
-	if (testing) {
+	if (testing)
+	{
 		themeName = testtheme;
-	} else {
+	}
+	else
+	{
 		themebase = string(THEMESDIR) + "/";
 		themeName = cfg->getOption("current_theme");
 		string::size_type pos;
-		if ((pos = themeName.find(",")) != string::npos) {
+		if ((pos = themeName.find(",")) != string::npos)
+		{
 			/* input is a set */
 			themeName = findValidRandomTheme(themeName);
-			if (themeName == "") {
+			if (themeName == "")
+			{
 				themeName = "default";
 			}
 		}
@@ -253,20 +298,27 @@ void App::Run()
 #endif
 
 	bool loaded = false;
-	while (!loaded) {
+	while (!loaded)
+	{
 		themedir = themebase + themeName;
 		themefile = themedir + THEMESFILE;
-		if (!cfg->readConf(themefile)) {
-			if (themeName == "default") {
+		if (!cfg->readConf(themefile))
+		{
+			if (themeName == "default")
+			{
 				logStream << APPNAME << ": Failed to open default theme file "
 					 << themefile << endl;
 				exit(ERR_EXIT);
-			} else {
+			}
+			else
+			{
 				logStream << APPNAME << ": Invalid theme in config: "
 					 << themeName << endl;
 				themeName = "default";
 			}
-		} else {
+		}
+		else
+		{
 			loaded = true;
 		}
 	}
@@ -286,13 +338,16 @@ void App::Run()
 		signal(SIGUSR1, User1Signal);
 
 #ifndef XNEST_DEBUG
-		if (!force_nodaemon && cfg->getOption("daemon") == "yes") {
+		if ( !force_nodaemon && cfg->getOption("daemon") == "yes" )
+		{
 			daemonmode = true;
 		}
 
 		/* Daemonize */
-		if (daemonmode) {
-			if (daemon(0, 0) == -1) {
+		if (daemonmode)
+		{
+			if (daemon(0, 0) == -1)
+			{
 				logStream << APPNAME << ": " << strerror(errno) << endl;
 				exit(ERR_EXIT);
 			}
@@ -306,15 +361,20 @@ void App::Run()
 		CreateServerAuth();
 		StartServer();
 #endif
-
 	}
 
-	/* Open display */
-	if ((Dpy = XOpenDisplay(DisplayName)) == 0) {
+	/* Open display if we haven't already (e.g. testing) */
+	if ( Dpy == 0 )
+		Dpy = XOpenDisplay(DisplayName);
+	/* Now check that it succeeded */
+	if ( Dpy == 0 )
+	{
 		logStream << APPNAME << ": could not open display '"
 			 << DisplayName << "'" << endl;
+#ifndef XNEST_DEBUG
 		if (!testing)
 			StopServer();
+#endif
 		exit(ERR_EXIT);
 	}
 
@@ -326,12 +386,15 @@ void App::Run()
 	BackgroundPixmapId = XInternAtom(Dpy, "_XROOTPMAP_ID", False);
 
 	/* for tests we use a standard window */
-	if (testing) {
-		Window RealRoot = RootWindow(Dpy, Scr);
+	if (testing)
+	{
+		Window RealRoot = Root;		// already done RootWindow(Dpy, Scr);
 		Root = XCreateSimpleWindow(Dpy, RealRoot, 0, 0, 1280, 1024, 0, 0, 0);
 		XMapWindow(Dpy, Root);
 		XFlush(Dpy);
-	} else {
+	}
+	else
+	{
 		blankScreen();
 	}
 
@@ -343,13 +406,15 @@ void App::Run()
 	bool focuspass = cfg->getOption("focus_password")=="yes";
 	bool autologin = cfg->getOption("auto_login")=="yes";
 
-	if (firstlogin && cfg->getOption("default_user") != "") {
-		LoginPanel->SetName(cfg->getOption("default_user"));
+	if ( firstlogin && ( cfg->getOption("default_user") != "" ) )
+	{
+		LoginPanel->SetName ( cfg->getOption("default_user") );
 		firstlogin = false;
 #ifdef USE_PAM
 		pam.set_item(PAM::Authenticator::User, cfg->getOption("default_user").c_str());
 #endif
-		if (autologin) {
+		if (autologin)
+		{
 #ifdef USE_PAM
 			try {
 				pam.check_acct();
@@ -366,23 +431,26 @@ void App::Run()
 
 	/* Set NumLock */
 	string numlock = cfg->getOption("numlock");
-	if (numlock == "on") {
+	if (numlock == "on")
 		NumLock::setOn(Dpy);
-	} else if (numlock == "off") {
+	else if (numlock == "off")
 		NumLock::setOff(Dpy);
-	}
+
 
 	/* Start looping */
 	int panelclosed = 1;
 	Panel::ActionType Action;
 
-	while (1) {
-		if (panelclosed) {
+	while (1)
+	{
+		if (panelclosed)
+		{
 			/* Init root */
 			setBackground(themedir);
 
 			/* Close all clients */
-			if (!testing) {
+			if (!testing)
+			{
 				KillAllClients(False);
 				KillAllClients(True);
 			}
@@ -391,20 +459,18 @@ void App::Run()
 			LoginPanel->OpenPanel();
 		}
 
-		LoginPanel->Reset();
-
-		if (firstloop && cfg->getOption("default_user") != "")
+		if ( firstloop )
 		{
-			LoginPanel->SetName(cfg->getOption("default_user"));
-		}
+			LoginPanel->Reset();
 
-		if (firstloop)
-		{
+			if ( cfg->getOption("default_user") != "" )
+				LoginPanel->SetName(cfg->getOption("default_user"));
+
 			// Removed by Gentoo "session-chooser" patch
 			//LoginPanel->SwitchSession();
 		}
 
-		if (!AuthenticateUser(focuspass && firstloop))
+		if ( !AuthenticateUser(focuspass && firstloop) )
 		{
 			unsigned int cfg_passwd_timeout;
 			cfg_passwd_timeout = Cfg::string2int(cfg->getOption("wrong_passwd_timeout").c_str());
@@ -412,7 +478,6 @@ void App::Run()
 				cfg_passwd_timeout = 60;
 			panelclosed = 0;
 			firstloop = false;
-			LoginPanel->ClearPanel();
 			LoginPanel->WrongPassword(cfg_passwd_timeout);
 			XBell(Dpy, 100);
 			continue;
@@ -422,7 +487,7 @@ void App::Run()
 
 		Action = LoginPanel->getAction();
 		/* for themes test we just quit */
-		if (testing)
+		if ( testing )
 		{
 			Action = Panel::Exit;
 		}
@@ -430,7 +495,8 @@ void App::Run()
 		panelclosed = 1;
 		LoginPanel->ClosePanel();
 
-		switch (Action) {
+		switch (Action)
+		{
 			case Panel::Login:
 				Login();
 				break;
@@ -465,10 +531,12 @@ bool App::AuthenticateUser(bool focuspass)
 		pam.authenticate();
 	}
 	catch(PAM::Auth_Exception& e){
-		switch (LoginPanel->getAction()) {
+		switch (LoginPanel->getAction())
+		{
 			case Panel::Exit:
 			case Panel::Console:
 				return true; /* <--- This is simply fake! */
+
 			default:
 				break;
 		}
@@ -484,14 +552,17 @@ bool App::AuthenticateUser(bool focuspass)
 #else
 bool App::AuthenticateUser(bool focuspass)
 {
-	if (!focuspass) {
+	if (!focuspass)
+	{
 		LoginPanel->EventHandler(Panel::Get_Name);
-		switch (LoginPanel->getAction()) {
+		switch (LoginPanel->getAction())
+		{
 			case Panel::Exit:
 			case Panel::Console:
 				logStream << APPNAME << ": Got a special command ("
 						<< LoginPanel->GetName() << ")" << endl;
 				return true; /* <--- This is simply fake! */
+
 			default:
 				break;
 		}
@@ -501,12 +572,14 @@ bool App::AuthenticateUser(bool focuspass)
 	char *encrypted, *correct;
 	struct passwd *pw;
 
-	switch (LoginPanel->getAction()) {
+	switch (LoginPanel->getAction())
+	{
 		case Panel::Suspend:
 		case Panel::Halt:
 		case Panel::Reboot:
 			pw = getpwnam("root");
 			break;
+
 		case Panel::Console:
 		case Panel::Exit:
 		case Panel::Login:
@@ -542,7 +615,8 @@ int App::GetServerPID()
 /* Hide the cursor */
 void App::HideCursor()
 {
-	if (cfg->getOption("hidecursor") == "true") {
+	if (cfg->getOption("hidecursor") == "true")
+	{
 		XColor			black;
 		char			cursordata[1];
 		Pixmap			cursorpixmap;
@@ -618,7 +692,8 @@ void App::Login()
 #endif
 
 #ifdef USE_CONSOLEKIT
-	if (consolekit_support_enabled) {
+	if (consolekit_support_enabled)
+	{
 		/* Setup the ConsoleKit session */
 		try {
 			ck.open_session(DisplayName, pw->pw_uid);
@@ -632,14 +707,16 @@ void App::Login()
 
 	/* Create new process */
 	pid = fork();
-	if (pid == 0) {
+	if (pid == 0)
+	{
 #ifdef USE_PAM
 		/* Get a copy of the environment and close the child's copy */
 		/* of the PAM-handle. */
 		char** child_env = pam.getenvlist();
 
 # ifdef USE_CONSOLEKIT
-		if (consolekit_support_enabled) {
+		if (consolekit_support_enabled)
+		{
 			char** old_env = child_env;
 
 			/* Grow the copy of the environment for the session cookie */
@@ -690,7 +767,8 @@ void App::Login()
 		replaceVariables(loginCommand, SESSION_VAR, session);
 		replaceVariables(loginCommand, THEME_VAR, themeName);
 		string sessStart = cfg->getOption("sessionstart_cmd");
-		if (sessStart != "") {
+		if (sessStart != "")
+		{
 			replaceVariables(sessStart, USER_VAR, pw->pw_name);
 			if ( system(sessStart.c_str()) < 0 )
 				logStream << APPNAME << ": Failed to run sessionstart_cmd" << endl;
@@ -706,7 +784,8 @@ void App::Login()
 	/* Wait until user is logging out (login process terminates) */
 	pid_t wpid = -1;
 	int status;
-	while (wpid != pid) {
+	while (wpid != pid)
+	{
 		wpid = wait(&status);
 		if (wpid == ServerPID)
 			xioerror(Dpy);	/* Server died, simulate IO error */
@@ -715,20 +794,25 @@ void App::Login()
 	/* Re-activate log file */
 	OpenLog();
 #endif
-	if (WIFEXITED(status) && WEXITSTATUS(status)) {
+	if (WIFEXITED(status) && WEXITSTATUS(status))
+	{
 		LoginPanel->Message("Failed to execute login command");
 		sleep(3);
-	} else {
+	}
+	else
+	{
 		string sessStop = cfg->getOption("sessionstop_cmd");
-		if (sessStop != "") {
-			replaceVariables(sessStop, USER_VAR, pw->pw_name);
+		if ( sessStop != "" )
+		{
+			replaceVariables ( sessStop, USER_VAR, pw->pw_name );
 			if ( system(sessStop.c_str()) < 0 )
 				logStream << APPNAME << "Session stop command failed" << endl;
 		}
 	}
 
 #ifdef USE_CONSOLEKIT
-	if (consolekit_support_enabled) {
+	if (consolekit_support_enabled)
+	{
 		try {
 			ck.close_session();
 		}
@@ -756,15 +840,15 @@ void App::Login()
 
 	/* Send TERM signal to clientgroup, if error send KILL */
 	if (killpg(pid, SIGTERM))
-	killpg(pid, SIGKILL);
+		killpg(pid, SIGKILL);
 
 	HideCursor();
 
 #ifndef XNEST_DEBUG
 	RestartServer();	/// @bug recursive call!
 #endif
-
 }
+
 
 void App::Reboot()
 {
@@ -813,6 +897,7 @@ void App::Halt()
 	exit(OK_EXIT);
 }
 
+
 void App::Suspend()
 {
 	sleep(1);
@@ -850,13 +935,16 @@ void App::Exit()
 	}
 #endif
 
-	if (testing) {
+	if (testing)
+	{
 		const char* testmsg = "This is a test message :-)";
 		LoginPanel->Message(testmsg);
 		sleep(3);
 		delete LoginPanel;
 		XCloseDisplay(Dpy);
-	} else {
+	}
+	else
+	{
 		delete LoginPanel;
 		StopServer();
 		RemoveLock();
@@ -883,15 +971,24 @@ void App::RestartServer()
 
 	StopServer();
 	RemoveLock();
-	if (force_nodaemon) {
+	if (force_nodaemon)
+	{
 		delete LoginPanel;
 		exit(ERR_EXIT); /* use ERR_EXIT so that systemd's RESTART=on-failure works */
-	} else {
-		while (waitpid(-1, NULL, WNOHANG) > 0); /* Collects all dead childrens */
+	}
+	else
+	{
+		while (waitpid(-1, NULL, WNOHANG) > 0); /* Collects all dead children */
 		Run();
 	}
 }
 
+
+/*
+ * Iterates over the list of all windows declared as children of Root and
+ * kills the clients. Since Root is the root window of the screen, all 
+ * running applications (of the logged-in session) should be caught by this
+ */
 void App::KillAllClients(Bool top)
 {
 	Window dummywindow;
@@ -905,8 +1002,10 @@ void App::KillAllClients(Bool top)
 
 	nchildren = 0;
 	XQueryTree(Dpy, Root, &dummywindow, &dummywindow, &children, &nchildren);
-	if (!top) {
-		for (i=0; i<nchildren; i++) {
+	if (!top)
+	{
+		for (i=0; i<nchildren; i++)
+		{
 			if (XGetWindowAttributes(Dpy, children[i], &attr) && (attr.map_state == IsViewable))
 				children[i] = XmuClientWindow(Dpy, children[i]);
 			else
@@ -914,15 +1013,17 @@ void App::KillAllClients(Bool top)
 		}
 	}
 
-	for (i=0; i<nchildren; i++) {
+	for (i=0; i<nchildren; i++)
+	{
 		if (children[i])
 			XKillClient(Dpy, children[i]);
 	}
-	XFree((char *)children);
+	XFree ( (void*)children );
 
 	XSync(Dpy, 0);
 	XSetErrorHandler(NULL);
 }
+
 
 int App::ServerTimeout(int timeout, char* text)
 {
@@ -930,11 +1031,13 @@ int App::ServerTimeout(int timeout, char* text)
 	int pidfound = -1;
 	static char	*lasttext;
 
-	while (1) {
+	while (1)
+	{
 		pidfound = waitpid(ServerPID, NULL, WNOHANG);
 		if (pidfound == ServerPID)
 			break;
-		if (timeout) {
+		if (timeout)
+		{
 			if (i == 0 && text != lasttext)
 				logStream << endl << APPNAME << ": waiting for " << text;
 			else
@@ -959,11 +1062,24 @@ int App::WaitForServer()
 	int	ncycles	 = 120;
 	int	cycles;
 
-	for (cycles = 0; cycles < ncycles; cycles++) {
-		if ((Dpy = XOpenDisplay(DisplayName))) {
+	/* The X server should send us a USR1 signal when it's ready. We trap 	*/
+	/* that signal and set a flag. If that's not already happened, wait for */
+	/* a good time. The incoming signal should terminate the sleep() call   */
+	/* with a non-zero return value. Otherwise, time out and try anyway but */
+	/* log the oddity.                                                      */
+	if ( !got_sigusr1 && ( sleep(5)==0 ) )
+		logStream << "WaitForServer: Not seen SigUSR1 from Xserver" << endl;
+
+	for (cycles = 0; cycles < ncycles; cycles++)
+	{
+		Dpy = XOpenDisplay(DisplayName);
+		if ( Dpy )
+		{
 			XSetIOErrorHandler(xioerror);
 			return 1;
-		} else {
+		}
+		else
+		{
 			if (!ServerTimeout(1, (char *) "X server to begin accepting connections"))
 				break;
 		}
@@ -976,7 +1092,9 @@ int App::WaitForServer()
 
 int App::StartServer()
 {
-	ServerPID = fork();
+	got_sigusr1 = false;	// We're about to start the X server so clear the semaphore
+
+	ServerPID = fork();		/// @bug why do this so early? Just before the switch makes more sense
 
 	int argc = 1, pos = 0, i;
 	static const int MAX_XSERVER_ARGS = 256;
@@ -991,16 +1109,21 @@ int App::StartServer()
 	serverStarted = false;
 
 	bool hasVtSet = false;
-	while (args[pos] != '\0') {
-		if (args[pos] == ' ' || args[pos] == '\t') {
+	while (args[pos] != '\0')
+	{
+		if (args[pos] == ' ' || args[pos] == '\t')
+		{
 			*(args+pos) = '\0';
 			server[argc++] = args+pos+1;
-		} else if (pos == 0) {
+		}
+		else if (pos == 0)
+		{
 			server[argc++] = args+pos;
 		}
 		++pos;
 
-		if (argc+1 >= MAX_XSERVER_ARGS) {
+		if (argc+1 >= MAX_XSERVER_ARGS)
+		{
 			/* ignore _all_ arguments to make sure the server starts at */
 			/* all */
 			argc = 1;
@@ -1008,17 +1131,21 @@ int App::StartServer()
 		}
 	}
 
-	for (i = 0; i < argc; i++) {
-		if (server[i][0] == 'v' && server[i][1] == 't') {
+	for (i = 0; i < argc; i++)
+	{
+		if (server[i][0] == 'v' && server[i][1] == 't')
+		{
 			bool ok = false;
 			Cfg::string2int(server[i]+2, &ok);
-			if (ok) {
+			if (ok)
+			{
 				hasVtSet = true;
 			}
 		}
 	}
 
-	if (!hasVtSet && daemonmode) {
+	if (!hasVtSet && daemonmode)
+	{
 		server[argc++] = (char*)"vt07";
 	}
 	server[argc] = NULL;
@@ -1040,13 +1167,16 @@ int App::StartServer()
 
 	default:
 		errno = 0;
-		if (!ServerTimeout(0, (char *)"")) {
+		// Prime the server timeout function and check for an immediate crash
+		if (!ServerTimeout(0, (char *)""))
+		{
 			ServerPID = -1;
 			break;
 		}
 
 		/* Wait for server to start up */
-		if (WaitForServer() == 0) {
+		if (WaitForServer() == 0)
+		{
 			logStream << APPNAME << ": unable to connect to X server" << endl;
 			StopServer();
 			ServerPID = -1;
@@ -1057,10 +1187,11 @@ int App::StartServer()
 
 	delete [] args;
 
-	serverStarted = true;
+	serverStarted = true;	///< @bug not true if ServerPID is -1
 
 	return ServerPID;
 }
+
 
 jmp_buf CloseEnv;
 int IgnoreXIO(Display *d)
@@ -1094,8 +1225,10 @@ void App::StopServer()
 
 	errno = 0;
 
-	if (killpg(ServerPID, SIGTERM) < 0) {
-		if (errno == EPERM) {
+	if (killpg(ServerPID, SIGTERM) < 0)
+	{
+		if (errno == EPERM)
+		{
 			logStream << APPNAME << ": can't kill X server" << endl;
 			exit(ERR_EXIT);
 		}
@@ -1104,7 +1237,8 @@ void App::StopServer()
 	}
 
 	/* Wait for server to shut down */
-	if (!ServerTimeout(10, (char *)"X server to shut down")) {
+	if (!ServerTimeout(10, (char *)"X server to shut down"))
+	{
 		logStream << endl;
 		return;
 	}
@@ -1114,13 +1248,15 @@ void App::StopServer()
 
 	/* Send KILL to server */
 	errno = 0;
-	if (killpg(ServerPID, SIGKILL) < 0) {
+	if (killpg(ServerPID, SIGKILL) < 0)
+	{
 		if (errno == ESRCH)
 			return;
 	}
 
 	/* Wait for server to die */
-	if (ServerTimeout(3, (char*)"server to die")) {
+	if (ServerTimeout(3, (char*)"server to die"))
+	{
 		logStream << endl << APPNAME << ": can't kill server" << endl;
 		exit(ERR_EXIT);
 	}
@@ -1142,28 +1278,37 @@ void App::setBackground(const string& themedir)
 {
 	string filename;
 	filename = themedir + "/background.png";
-	image = new Image;
+	Image *image = new Image;
 	bool loaded = image->Read(filename.c_str());
-	if (!loaded) { /* try jpeg if png failed */
+	if (!loaded)
+	{ /* try jpeg if png failed */
 		filename = themedir + "/background.jpg";
 		loaded = image->Read(filename.c_str());
 	}
 
-	if (loaded) {
+	if (loaded)
+	{
 		string bgstyle = cfg->getOption("background_style");
-		if (bgstyle == "stretch") {
+		if (bgstyle == "stretch")
+		{
 			image->Resize(XWidthOfScreen(ScreenOfDisplay(Dpy, Scr)),
 						XHeightOfScreen(ScreenOfDisplay(Dpy, Scr)));
-		} else if (bgstyle == "tile") {
+		}
+		else if (bgstyle == "tile")
+		{
 			image->Tile(XWidthOfScreen(ScreenOfDisplay(Dpy, Scr)),
 						XHeightOfScreen(ScreenOfDisplay(Dpy, Scr)));
-		} else if (bgstyle == "center") {
+		}
+		else if (bgstyle == "center")
+		{
 			string hexvalue = cfg->getOption("background_color");
 			hexvalue = hexvalue.substr(1,6);
 			image->Center(XWidthOfScreen(ScreenOfDisplay(Dpy, Scr)),
 						XHeightOfScreen(ScreenOfDisplay(Dpy, Scr)),
 						hexvalue.c_str());
-		} else { /* plain color or error */
+		}
+		else
+		{ /* plain color or error */
 			string hexvalue = cfg->getOption("background_color");
 			hexvalue = hexvalue.substr(1,6);
 			image->Center(XWidthOfScreen(ScreenOfDisplay(Dpy, Scr)),
@@ -1173,7 +1318,7 @@ void App::setBackground(const string& themedir)
 		Pixmap p = image->createPixmap(Dpy, Scr, Root);
 		XSetWindowBackgroundPixmap(Dpy, Root, p);
 		XChangeProperty(Dpy, Root, BackgroundPixmapId, XA_PIXMAP, 32,
-			PropModeReplace, (unsigned char *)&p, 1);
+					PropModeReplace, (unsigned char *)&p, 1);
 	}
 	XClearWindow(Dpy, Root);
 
@@ -1181,37 +1326,47 @@ void App::setBackground(const string& themedir)
 	delete image;
 }
 
+
 /* Check if there is a lockfile and a corresponding process */
 void App::GetLock()
 {
 	std::ifstream lockfile(cfg->getOption("lockfile").c_str());
-	if (!lockfile) {
+	if (!lockfile)
+	{
 		/* no lockfile present, create one */
 		std::ofstream lockfile(cfg->getOption("lockfile").c_str(), ios_base::out);
-		if (!lockfile) {
+		if (!lockfile)
+		{
 			logStream << APPNAME << ": Could not create lock file: " <<
 					cfg->getOption("lockfile").c_str() << std::endl;
 			exit(ERR_EXIT);
 		}
 		lockfile << getpid() << std::endl;
 		lockfile.close();
-	} else {
+	}
+	else
+	{
 		/* lockfile present, read pid from it */
 		int pid = 0;
 		lockfile >> pid;
 		lockfile.close();
-		if (pid > 0) {
+		if (pid > 0)
+		{
 			/* see if process with this pid exists */
 			int ret = kill(pid, 0);
-			if (ret == 0 || (ret == -1 && errno == EPERM) ) {
+			if (ret == 0 || (ret == -1 && errno == EPERM) )
+			{
 				logStream << APPNAME <<
 					": Another instance of the program is already running with PID "
 					<< pid << std::endl;
 				exit(0);
-			} else {
+			}
+			else
+			{
 				logStream << APPNAME << ": Stale lockfile found, removing it" << std::endl;
 				std::ofstream lockfile(cfg->getOption("lockfile").c_str(), ios_base::out);
-				if (!lockfile) {
+				if (!lockfile)
+				{
 					logStream << APPNAME <<
 						": Could not create new lock file: " << cfg->getOption("lockfile")
 						<< std::endl;
@@ -1224,11 +1379,13 @@ void App::GetLock()
 	}
 }
 
-/* Remove lockfile and close logs */
+
+/* Remove lockfile */
 void App::RemoveLock()
 {
 	remove(cfg->getOption("lockfile").c_str());
 }
+
 
 /* Get server start check flag. */
 bool App::isServerStarted()
@@ -1236,10 +1393,12 @@ bool App::isServerStarted()
 	return serverStarted;
 }
 
-/* Redirect stdout and stderr to log file */
+
+/* Open a log file for error reporting */
 void App::OpenLog()
 {
-	if ( !logStream.openLog( cfg->getOption("logfile").c_str() ) ) {
+	if ( !logStream.openLog( cfg->getOption("logfile").c_str() ) )
+	{
 		cerr <<  APPNAME << ": Could not accesss log file: " << cfg->getOption("logfile") << endl;
 		RemoveLock();
 		exit(ERR_EXIT);
@@ -1247,20 +1406,27 @@ void App::OpenLog()
 	/* I should set the buffers to imediate write, but I just flush on every << operation. */
 }
 
-/* Relases stdout/err */
+
+/* Close the logging stream - just a wrapper round the real method */
 void App::CloseLog()
 {
 	/* Simply closing the log */
 	logStream.closeLog();
 }
 
+
+/*
+ * Choose a theme at random from the list in the config file. IF the theme
+ * file cannot be found then issue a warning and try again.
+ */
 string App::findValidRandomTheme(const string& set)
 {
 	/* extract random theme from theme set; return empty string on error */
 	string name = set;
 	struct stat buf;
 
-	if (name[name.length()-1] == ',') {
+	if (name[name.length()-1] == ',')
+	{
 		name = name.substr(0, name.length() - 1);
 	}
 
@@ -1274,7 +1440,8 @@ string App::findValidRandomTheme(const string& set)
 
 		name = Cfg::Trim(themes[sel]);
 		themefile = string(THEMESDIR) +"/" + name + THEMESFILE;
-		if (stat(themefile.c_str(), &buf) != 0) {
+		if (stat(themefile.c_str(), &buf) != 0)
+		{
 			themes.erase(find(themes.begin(), themes.end(), name));
 			logStream << APPNAME << ": Invalid theme in config: "
 				 << name << endl;
@@ -1285,6 +1452,11 @@ string App::findValidRandomTheme(const string& set)
 }
 
 
+/*
+ * Populate any matching fields in a markup string with the value of
+ * a variable. The markup is %name but that is not enforced here - instead
+ * the caller must pass the full markup tag - %name, not just name
+ */
 void App::replaceVariables(string& input,
 			   const string& var,
 			   const string& value)
@@ -1296,9 +1468,10 @@ void App::replaceVariables(string& input,
 	}
 }
 
+
 /*
- * We rely on the fact that all bits generated by Util::random()
- * are usable, so we are taking full words from its output.
+ * Set the required server authority parameters in the environment
+ * and file system.
  */
 void App::CreateServerAuth()
 {
@@ -1309,7 +1482,10 @@ void App::CreateServerAuth()
 	string authfile;
 	const char *digits = "0123456789abcdef";
 	Util::srandom(Util::makeseed());
-	for (i = 0; i < App::mcookiesize; i+=4) {
+	for (i = 0; i < App::mcookiesize; i+=4)
+	{
+		/* We rely on the fact that all bits generated by Util::random()
+		 * are usable, so we are taking full words from its output.		*/
 		word = Util::random() & 0xffff;
 		lo = word & 0xff;
 		hi = word >> 8;
@@ -1326,6 +1502,11 @@ void App::CreateServerAuth()
 	  authfile);
 }
 
+
+/*
+ * Concatenate two C-style strings into a newly alloc'd char array of the
+ * right size.
+ */
 char* App::StrConcat(const char* str1, const char* str2)
 {
 	char* tmp = new char[strlen(str1) + strlen(str2) + 1];
@@ -1334,6 +1515,10 @@ char* App::StrConcat(const char* str1, const char* str2)
 	return tmp;
 }
 
+
+/*
+ * Write our process ID to the lock file specified in the config
+ */
 void App::UpdatePid()
 {
 	std::ofstream lockfile(cfg->getOption("lockfile").c_str(), ios_base::out);
@@ -1345,3 +1530,4 @@ void App::UpdatePid()
 	lockfile << getpid() << endl;
 	lockfile.close();
 }
+

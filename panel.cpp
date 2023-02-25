@@ -206,6 +206,7 @@ Panel::Panel(Display* dpy, int scr, Window root, Cfg* config,
 		field = Get_Passwd;
 		OnExpose();
 	}
+	MsgExtents.width = 0;
 }
 
 Panel::~Panel()
@@ -270,23 +271,17 @@ void Panel::ClosePanel()
 	XFlush(Dpy);
 }
 
-void Panel::ClearPanel()
-{
-	session_name = "";
-    session_exec = "";
-	Reset();
-	XClearWindow(Dpy, Root);
-	XClearWindow(Dpy, Win);
-	Cursor(SHOW);
-	ShowText();
-	XFlush(Dpy);
-}
-
 void Panel::WrongPassword(int timeout)
 {
 	string message;
-	XGlyphInfo extents;
 	XWindowAttributes attributes;
+
+	if ( mode == Mode_DM )
+	{
+		session_name = "";
+		session_exec = "";
+		XClearWindow(Dpy, Root);
+	}
 
 #if 0
 	if (CapsLockOn)
@@ -299,26 +294,39 @@ void Panel::WrongPassword(int timeout)
 
 	XftDraw *draw = XftDrawCreate(Dpy, Win,
 		DefaultVisual(Dpy, Scr), DefaultColormap(Dpy, Scr));
-		XftTextExtents8(Dpy, msgfont, reinterpret_cast<const XftChar8*>(message.c_str()),
-		message.length(), &extents);
+	XftTextExtents8(Dpy, msgfont, reinterpret_cast<const XftChar8*>(message.c_str()),
+		message.length(), &MsgExtents);
 
 	string cfgX = cfg->getOption("passwd_feedback_x");
 	string cfgY = cfg->getOption("passwd_feedback_y");
 	int shadowXOffset = cfg->getIntOption("msg_shadow_xoffset");
 	int shadowYOffset = cfg->getIntOption("msg_shadow_yoffset");
-	int msg_x = Cfg::absolutepos(cfgX, attributes.width, extents.width);
-	int msg_y = Cfg::absolutepos(cfgY, attributes.height, extents.height);
+	int msg_x = Cfg::absolutepos(cfgX, attributes.width, MsgExtents.width);
+	int msg_y = Cfg::absolutepos(cfgY, attributes.height, MsgExtents.height);
 
-	OnExpose();
-	SlimDrawString8(draw, &msgcolor, msgfont, msg_x, msg_y, message,
-		&msgshadowcolor, shadowXOffset, shadowYOffset);
+	MsgExtents.x = msg_x;
+	MsgExtents.y = msg_y - MsgExtents.height;
 
-	if (cfg->getOption("bell") == "1")
-		XBell(Dpy, 100);
+	if ( timeout > 0 )
+	{
+		OnExpose();
+		SlimDrawString8(draw, &msgcolor, msgfont, msg_x, msg_y, message,
+			&msgshadowcolor, shadowXOffset, shadowYOffset);
 
-	XFlush(Dpy);
-	sleep(timeout);
+		if (cfg->getOption("bell") == "1")
+			XBell(Dpy, 100);
+		XFlush(Dpy);
+		sleep(timeout);
+	}
 	ResetPasswd();
+	if ( mode == Mode_DM )
+	{
+		if ( cfg->getIntOption("keep_user_on_fail") == 0 )
+		{
+			ResetName();
+		}
+		field = Get_Name;
+	}
 	OnExpose();
 	// The message should stay on the screen even after the password field is
 	// cleared, methinks. I don't like this solution, but it works.
@@ -364,15 +372,6 @@ void Panel::Message(const string& text)
 					 shadowXOffset, shadowYOffset);
 	XFlush(Dpy);
 	XftDrawDestroy(draw);
-}
-
-void Panel::Error(const string& text)
-{
-	ClosePanel();
-	Message(text);
-	sleep(ERROR_DURATION);
-	OpenPanel();
-	ClearPanel();
 }
 
 unsigned long Panel::GetColor(const char* colorname)
@@ -456,18 +455,22 @@ void Panel::EventHandler(const Panel::FieldType& curfield)
 	field = curfield;
 	bool loop = true;
 
-	if (mode == Mode_DM)
+	if ( (mode == Mode_DM) && ( MsgExtents.width == 0 ) )
 		OnExpose();
 
 	struct pollfd x11_pfd = {0};
 	x11_pfd.fd = ConnectionNumber(Dpy);
 	x11_pfd.events = POLLIN;
 
-	while (loop) {
-		if (XPending(Dpy) || poll(&x11_pfd, 1, -1) > 0) {
-			while(XPending(Dpy)) {
+	while (loop)
+	{
+		if (XPending(Dpy) || poll(&x11_pfd, 1, -1) > 0)
+		{
+			while(XPending(Dpy))
+			{
 				XNextEvent(Dpy, &event);
-				switch(event.type) {
+				switch(event.type)
+				{
 					case Expose:
 						OnExpose();
 						break;
@@ -476,6 +479,17 @@ void Panel::EventHandler(const Panel::FieldType& curfield)
 						loop=OnKeyPress(event);
 						break;
 				}
+			}
+			if ( MsgExtents.width > 0 )
+			{
+				if (mode == Mode_Lock)
+					ApplyBackground(Rectangle(MsgExtents.x,
+						MsgExtents.y, MsgExtents.width+1,
+						MsgExtents.height+2));
+				else
+					XClearArea(Dpy, Win, MsgExtents.x, MsgExtents.y,
+						MsgExtents.width+1, MsgExtents.height+2, false);
+				MsgExtents.width = 0;
 			}
 		}
 	}
@@ -595,7 +609,7 @@ bool Panel::OnKeyPress(XEvent& event)
 			return false;
 		default:
 			break;
-	};
+	}
 
 	Cursor(HIDE);
 	switch(keysym){

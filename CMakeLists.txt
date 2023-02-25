@@ -19,7 +19,7 @@ INCLUDE(GNUInstallDirs)
 # Version
 set(SLIM_VERSION_MAJOR "1")
 set(SLIM_VERSION_MINOR "3")
-set(SLIM_VERSION_PATCH "8")
+set(SLIM_VERSION_PATCH "9")
 set(SLIM_VERSION "${SLIM_VERSION_MAJOR}.${SLIM_VERSION_MINOR}.${SLIM_VERSION_PATCH}")
 
 set(PKGDATADIR "${CMAKE_INSTALL_FULL_DATADIR}/slim")
@@ -232,8 +232,8 @@ endif (BUILD_SHARED_LIBS)
 # man file
 install(FILES slim.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
-# configure
-install(FILES slim.conf DESTINATION ${CMAKE_INSTALL_SYSCONFDIR})
+# configure - in theory we should use CMAKE_INSTALL_SYSCONFDIR but that doesn't work
+install(FILES slim.conf DESTINATION ${SYSCONFDIR})
 
 # systemd service file - commented out as broken - not all Linux uses systemd!
 #if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
