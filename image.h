@@ -29,10 +29,10 @@ public:
 
 	const unsigned char *getPNGAlpha() const {
 		return(png_alpha);
-	};
+	}
 	const unsigned char *getRGBData() const {
 		return(rgb_data);
-	};
+	}
 
 	void getPixel(double px, double py, unsigned char *pixel);
 	void getPixel(double px, double py, unsigned char *pixel,
@@ -40,19 +40,16 @@ public:
 
 	int Width() const {
 		return(width);
-	};
+	}
 	int Height() const {
 		return(height);
-	};
-	void Quality(const int q) {
-		quality_ = q;
-	};
+	}
 
 	bool Read(const char *filename);
 
 	void Reduce(const int factor);
 	void Resize(const int w, const int h);
-	void Merge(Image *background, const int x, const int y);
+	void Merge ( const Image *background, const int x, const int y );
 	void Merge_non_crop(Image* background, const int x, const int y);
 	void Crop(const int x, const int y, const int w, const int h);
 	void Tile(const int w, const int h);
@@ -68,8 +65,6 @@ private:
 	int width, height, area;
 	unsigned char *rgb_data;
 	unsigned char *png_alpha;
-
-	int quality_;
 
 	int readJpeg(const char *filename, int *width, int *height,
 		unsigned char **rgb);

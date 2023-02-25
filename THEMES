@@ -37,7 +37,7 @@ OPTIONS
     session_x               50%
     session_y               90%
 
-    # style of background: 'stretch', 'tile', 'center', 'color'
+    # style of background ('stretch', 'tile', 'center') and color
     background_style        stretch
     background_color		#FF0033
 
@@ -45,10 +45,11 @@ OPTIONS
     input_panel_x           50%
     input_panel_y           40%
     
-    # input controls horizontal and vertical positions.
-    # IMPORTANT! set input_pass_x and input_pass_y to -1
-    # to use a single input box for username/password (GDM Style).
-    # Note that this fields only accept absolute values.
+    # Input controls horizontal and vertical positions relative to
+    # the panel.
+    # Set input_pass_x and input_pass_y to -1 to use a single input
+    # box for username/password (GDM Style).
+    # Note that these fields only accept absolute values.
     input_name_x            40
     input_name_y            100
     input_pass_x            40
@@ -84,6 +85,13 @@ OPTIONS
     # is needed (ie, when already present in the panel image)
     username_msg            Please enter your username
     password_msg            Please enter your password
+    
+    # Optional message to show on a failed login. Similar set of values
+    # to the above. Use -1 for the x & y to disable (default).
+    password_feedback_x     50%
+    password_feedback_y     165
+    password_feedback_msg	Authentication failed
+    # The font and color are inherited from msg_xxx
     ----------------------------------------------------------------------
 
 SHADOWS
@@ -102,7 +110,7 @@ SHADOWS
     welcome_shadow_color        #ff0000
     ----------------------------------------------------------------------
      
-    The other keys are analogue:
+    The other keys are analogous:
     ----------------------------------------------------------------------
     # for username and password label
     username_shadow_xoffset 	2

@@ -13,7 +13,6 @@
 #define _APP_H_
 
 #include <X11/Xlib.h>
-#include <X11/Xatom.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -59,14 +58,12 @@ private:
 	void ReadConfig();
 	void OpenLog();
 	void CloseLog();
-	void HideCursor();
 	void CreateServerAuth();
 	char *StrConcat(const char *str1, const char *str2);
 	void UpdatePid();
 
 	bool AuthenticateUser(bool focuspass);
 
-	static std::string findValidRandomTheme(const std::string &set);
 	static void replaceVariables(std::string &input,
 								 const std::string &var,
 								 const std::string &value);
@@ -97,15 +94,13 @@ private:
 
 	void blankScreen();
 
-	Atom BackgroundPixmapId;	// from XInternAtom -- does it need to be a member var?
-	void setBackground(const std::string &themedir);
-
 	bool firstlogin;	///< Whether to exhibit first login behaviour, or repeat
 	bool daemonmode;	///< Are we running as a daemon?
 	bool force_nodaemon;	///< Are we forced NOT to be a daemon?
 	/* For testing themes */
 	char *testtheme;	///< Name of the theme to test, from command line
 	bool testing;		///< Whether we're running in theme testing mode
+	short tww, twh;		///< The user's requested test window size
 
 #ifdef USE_CONSOLEKIT
 	bool consolekit_support_enabled;	///< Whether to use ConsoleKit (not compatible with systemd)

@@ -1,5 +1,5 @@
 # the following variable defines the session which is started if the user
-# doesn't explicitely select a session
+# doesn't explicitly select a session
 DEFAULT_SESSION=twm
 
 case $1 in

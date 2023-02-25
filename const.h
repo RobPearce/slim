@@ -2,6 +2,7 @@
  *  Copyright (C) 1997, 1998 Per Liden
  *  Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
  *  Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
+ *  Copyright (C) 2022-23 Rob Pearce <slim@flitspace.org.uk>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,11 +26,6 @@
 
 #define OK_EXIT	 0
 #define ERR_EXIT	1
-
-/* duration for showing error messages,
- * as "login command failed", in seconds 
- */
-#define ERROR_DURATION  5
 
 /* variables replaced in login_cmd */
 #define SESSION_VAR	 "%session"

@@ -1,16 +1,17 @@
 /* SLiM - Simple Login Manager
-   Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
-   Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
-   Copyright (C) 2012	Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   The following code has been adapted and extended from
-   xplanet 1.0.1, Copyright (C) 2002-04 Hari Nair <hari@alumni.caltech.edu>
-*/
+ *  Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
+ *  Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
+ *  Copyright (C) 2012	Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+ *  Copyright (C) 2022-23 Rob Pearce <slim@flitspace.org.uk>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  The following code has been adapted and extended from
+ *  xplanet 1.0.1, Copyright (C) 2002-04 Hari Nair <hari@alumni.caltech.edu>
+ */
 
 #include <cctype>
 #include <cmath>
@@ -31,14 +32,13 @@ extern "C" {
 }
 
 Image::Image()
-	: width(0), height(0), area(0), rgb_data(NULL), png_alpha(NULL),
-	  quality_(80)
+	: width(0), height(0), area(0), rgb_data(NULL), png_alpha(NULL)
 {
 }
 
 Image::Image ( const int w, const int h, const unsigned char *rgb,
 		const unsigned char *alpha)
-	: width(w), height(h), area(w*h), quality_(80)
+	: width(w), height(h), area(w*h)
 {
 	width = w;
 	height = h;
@@ -84,7 +84,8 @@ bool Image::Read(const char *filename)
 		success = readPng(filename, &width, &height, &rgb_data, &png_alpha);
 	else if ((ubuf[0] == 0xff) && (ubuf[1] == 0xd8))
 		success = readJpeg(filename, &width, &height, &rgb_data);
-	else {
+	else
+	{
 		fprintf(stderr, "Unknown image format\n");
 		success = 0;
 	}
@@ -182,7 +183,7 @@ void Image::Resize(const int w, const int h)
 }
 
 /* Find the color of the desired point using bilinear interpolation. */
-/* Assume the array indices refer to the denter of the pixel, so each */
+/* Assume the array indices refer to the center of the pixel, so each */
 /* pixel has corners at (i - 0.5, j - 0.5) and (i + 0.5, j + 0.5) */
 void Image::getPixel(double x, double y, unsigned char *pixel)
 {
@@ -248,54 +249,51 @@ void Image::getPixel(double x, double y, unsigned char *pixel, unsigned char *al
 	}
 }
 
-/* Merge the image with a background, taking care of the
- * image Alpha transparency. (background alpha is ignored).
- * The images is merged on position (x, y) on the
- * background, the background must contain the image.
- */
-void Image::Merge(Image* background, const int x, const int y)
-{
 
-	if (x + width > background->Width()|| y + height > background->Height())
+/**
+ * Merge the image with a background, taking care of the image Alpha
+ * transparency. (background alpha is ignored).
+ *
+ * The image is merged with the section of background at position (x, y).
+ * The background must fully contain the image.
+ * If the image does not have any transparency (no alpha data) then this
+ * is a no-operation.
+ * @note use of double to calculate the new value of a U8
+ */
+void Image::Merge ( const Image* background, const int x, const int y )
+{
+	if ( ( x + width > background->Width() )
+	  || ( y + height > background->Height() ) )
 		return;
 
-	if (background->Width()*background->Height() != width*height)
-		background->Crop(x, y, width, height);
-
-	double tmp;
-	unsigned char *new_rgb = (unsigned char *) malloc(3 * width * height);
-	memset(new_rgb, 0, 3 * width * height);
-	const unsigned char *bg_rgb = background->getRGBData();
-
-	int ipos = 0;
-	if (png_alpha != NULL){
-		for (int j = 0; j < height; j++) {
-			for (int i = 0; i < width; i++) {
-				for (int k = 0; k < 3; k++) {
-					tmp = rgb_data[3*ipos + k]*png_alpha[ipos]/255.0
-							+ bg_rgb[3*ipos + k]*(1-png_alpha[ipos]/255.0);
-					new_rgb[3*ipos + k] = static_cast<unsigned char> (tmp);
+	if (png_alpha != NULL)
+	{
+		unsigned char *new_rgb = (unsigned char *) malloc(3 * width * height);
+		const unsigned char *bg_rgb = background->getRGBData();
+		double tmp;
+		int opos = 0;
+		for (int j = 0; j < height; j++)
+		{
+			int ipos = (y+j) * background->Width() + x;
+			for (int i = 0; i < width; i++)
+			{
+				for (int k = 0; k < 3; k++)
+				{
+					tmp = rgb_data[3*opos + k]*png_alpha[opos]/255.0
+							+ bg_rgb[3*ipos + k]*(1-png_alpha[opos]/255.0);
+					new_rgb[3*opos + k] = static_cast<unsigned char> (tmp);
 				}
+				opos++;
 				ipos++;
 			}
 		}
-	} else {
-		for (int j = 0; j < height; j++) {
-			for (int i = 0; i < width; i++) {
-				for (int k = 0; k < 3; k++) {
-					tmp = rgb_data[3*ipos + k];
-					new_rgb[3*ipos + k] = static_cast<unsigned char> (tmp);
-				}
-				ipos++;
-			}
-		}
+		free(rgb_data);
+		free(png_alpha);
+		rgb_data = new_rgb;
+		png_alpha = NULL;
 	}
-
-	free(rgb_data);
-	free(png_alpha);
-	rgb_data = new_rgb;
-	png_alpha = NULL;
 }
+
 
 /* Merge the image with a background, taking care of the
  * image Alpha transparency. (background alpha is ignored).
@@ -350,6 +348,7 @@ void Image::Merge_non_crop(Image* background, const int x, const int y)
 	png_alpha = NULL;
 }
 
+
 /* Tile the image growing its size to the minimum entire
  * multiple of w * h.
  * The new dimensions should be > of the current ones.
@@ -357,7 +356,6 @@ void Image::Merge_non_crop(Image* background, const int x, const int y)
  */
 void Image::Tile(const int w, const int h)
 {
-
 	if (w < width || h < height)
 		return;
 
@@ -401,11 +399,11 @@ void Image::Tile(const int w, const int h)
 	Crop(0,0,w,h);
 }
 
+
 /* Crop the image
  */
 void Image::Crop(const int x, const int y, const int w, const int h)
 {
-
 	if (x+w > width || y+h > height) {
 		return;
 	}
@@ -447,12 +445,12 @@ void Image::Crop(const int x, const int y, const int w, const int h)
 	area = w * h;
 }
 
+
 /* Center the image in a rectangle of given width and height.
  * Fills the remaining space (if any) with the hex color
  */
 void Image::Center(const int w, const int h, const char *hex)
 {
-
 	unsigned long packed_rgb;
 	sscanf(hex, "%lx", &packed_rgb);
 
@@ -525,12 +523,12 @@ void Image::Center(const int w, const int h, const char *hex)
 	height = h;
 }
 
+
 /* Fill the image with the given color and adjust its dimensions
  * to passed values.
  */
 void Image::Plain(const int w, const int h, const char *hex)
 {
-
 	unsigned long packed_rgb;
 	sscanf(hex, "%lx", &packed_rgb);
 
@@ -556,6 +554,7 @@ void Image::Plain(const int w, const int h, const char *hex)
 	height = h;
 }
 
+
 void Image::computeShift(unsigned long mask,
 					unsigned char &left_shift,
 					unsigned char &right_shift)
@@ -573,6 +572,7 @@ void Image::computeShift(unsigned long mask,
 		}
 	}
 }
+
 
 Pixmap Image::createPixmap(Display* dpy, int scr, Window win)
 {
@@ -838,12 +838,13 @@ int Image::readPng(const char *filename, int *width, int *height,
 	}
 
 #if PNG_LIBPNG_VER_MAJOR >= 1 && PNG_LIBPNG_VER_MINOR >= 4
-		if (setjmp(png_jmpbuf((png_ptr)))) {
-#else
-	if (setjmp(png_ptr->jmpbuf)) {
-#endif
+	if (setjmp(png_jmpbuf((png_ptr))))
 		goto png_destroy;
-	}
+#else
+	if (setjmp(png_ptr->jmpbuf))
+		goto png_destroy;
+#endif
+
 
 	png_init_io(png_ptr, infile);
 	png_read_info(png_ptr, info_ptr);

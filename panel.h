@@ -3,6 +3,7 @@
    Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
    Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
    Copyright (C) 2013 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+   Copyright (C) 2022-23 Rob Pearce <slim@flitspace.org.uk>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -53,7 +54,7 @@ class Panel
 public:
 	enum ActionType {
 		Login,
-		Lock,
+		UnLock = Login,     // slimlock doesn't actually care about this
 		Console,
 		Reboot,
 		Halt,
@@ -68,6 +69,7 @@ public:
 
 	enum PanelType {
 		Mode_DM,
+		Mode_Test,
 		Mode_Lock
 	};
 
@@ -90,9 +92,13 @@ public:
 	const std::string& GetPasswd(void) const;
 	void SwitchSession();
 
+	Atom BackgroundPixmapId;	// from XInternAtom -- does it need to be a member var?
+	void setBackground(void);
+	void HideCursor();
+
 private:
 	Panel();
-	void Cursor(int visible);
+	void TextCursor(int visible);
 	unsigned long GetColor(const char *colorname);
 	void OnExpose(void);
 	void EraseLastChar(std::string &formerString);
@@ -124,8 +130,6 @@ private:
 	XftColor msgcolor;
 	XftColor msgshadowcolor;
 	XftFont *msgfont;
-	XftColor introcolor;
-	XftFont *introfont;
 	XftFont *welcomefont;
 	XftColor welcomecolor;
 	XftFont *sessionfont;
@@ -137,7 +141,6 @@ private:
 	XftColor entershadowcolor;
 	ActionType action;
 	FieldType field;
-	//Pixmap   background;
 	XGlyphInfo MsgExtents;
 	
 	/* Username/Password */
@@ -155,15 +158,12 @@ private:
 	int input_pass_y;
 	int inputShadowXOffset;
 	int inputShadowYOffset;
-	int input_cursor_height;
 	int welcome_x;
 	int welcome_y;
 	int welcome_shadow_xoffset;
 	int welcome_shadow_yoffset;
 	int session_shadow_xoffset;
 	int session_shadow_yoffset;
-	int intro_x;
-	int intro_y;
 	int username_x;
 	int username_y;
 	int username_shadow_xoffset;
@@ -171,15 +171,13 @@ private:
 	int password_x;
 	int password_y;
 	std::string welcome_message;
-	std::string intro_message;
 
 	/* Pixmap data */
 	Pixmap PanelPixmap;
 
 	Image *image;
+	Image *bgImg;
 
-	/* For thesting themes */
-	bool testing;
 	std::string themedir;
 
 	/* Session handling */

@@ -39,7 +39,6 @@ private:
 	Cfg* cfg;
 	struct passwd *Pw;
 
-	std::string displayName;
 	char** env;
 };
 

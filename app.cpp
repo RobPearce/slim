@@ -155,7 +155,7 @@ App::App(int argc, char** argv)
 #endif
 	  cfg(0),
 	  firstlogin(true), daemonmode(false), force_nodaemon(false),
-	  testing(false),
+	  testing(false), tww(1280), twh(1024),
 #ifdef USE_CONSOLEKIT
 	  consolekit_support_enabled(true),
 #endif
@@ -163,10 +163,13 @@ App::App(int argc, char** argv)
 {
 	int tmp;
 	mcookie = string(App::mcookiesize, 'a');
+	char * win_size = 0;
 	
 	/* Parse command line
-	   Note: we force a option for nodaemon switch to handle "-nodaemon" */
-	while ((tmp = getopt(argc, argv, "c:vhsp:n:d?")) != EOF)
+	   Note: we allow an arg for the -n option to handle "-nodaemon" as
+			 originally quoted in the docs. However, the parser has never
+			 checked the arg, so "-noddy" works exactly the same */
+	while ((tmp = getopt(argc, argv, "c:vhsp:w:n::d")) != EOF)
 	{
 		switch (tmp)
 		{
@@ -195,6 +198,16 @@ App::App(int argc, char** argv)
 			}
 			break;
 
+		case 'w':	/* Window size for theme test mode */
+			if ( !testing )
+			{
+				cerr << "The -w option is only valid after -p" << endl;
+				exit(ERR_EXIT);
+			}
+			win_size = optarg;
+			// Test for valid syntax later
+			break;
+
 		case 'd':	/* Daemon mode */
 			daemonmode = true;
 			break;
@@ -215,19 +228,21 @@ App::App(int argc, char** argv)
 			break;
 #endif
 
-		case '?':	/* Illegal */
+		case '?':	/* Illegal option - getopt will have printed an error */
 			std::cout << endl;
 		case 'h':   /* Help */
 			std::cout << "usage:  " << APPNAME << " [option ...]" << endl
 			<< "options:" << endl
-			<< "	-c /path/to/config: select configuration file" << endl
-			<< "	-d: daemon mode" << endl
-			<< "	-n: no-daemon mode" << endl
-			<< "	-v: show version" << endl
+			<< "  -c /path/to/config   select configuration file" << endl
+			<< "  -d                   daemon mode" << endl
+			<< "  -n                   no-daemon mode" << endl
 #ifdef USE_CONSOLEKIT
-			<< "	-s: start for systemd, disable consolekit support" << endl
+			<< "  -s                   start for systemd, disable consolekit support" << endl
 #endif
-			<< "	-p /path/to/theme/dir: preview theme" << endl;
+			<< "  -p /path/to/themedir preview theme" << endl
+			<< "  -w <www>x<hhh>       size of window for preview" << endl
+			<< "  -h                   show this help" << endl
+			<< "  -v                   show version" << endl;
 			exit(OK_EXIT);
 			break;
 		}
@@ -239,8 +254,19 @@ App::App(int argc, char** argv)
 		exit(ERR_EXIT);
 	}
 #endif /* XNEST_DEBUG */
-
+	if ( win_size )
+	{
+		char* sep = 0;
+		tww = (short)strtol ( win_size, &sep, 10 );
+		if ( ( sep == 0 ) || ( *sep++ != 'x' ) )
+		{
+			cerr << "Malformed argument to -w option" << endl;
+			exit(ERR_EXIT);
+		}
+		twh = (short)strtol ( sep, &sep, 10 );
+	}
 }
+
 
 void App::Run()
 {
@@ -264,7 +290,7 @@ void App::Run()
 	string themebase = "";
 	string themefile = "";
 	string themedir = "";
-	themeName = "";
+
 	if (testing)
 	{
 		themeName = testtheme;
@@ -277,7 +303,7 @@ void App::Run()
 		if ((pos = themeName.find(",")) != string::npos)
 		{
 			/* input is a set */
-			themeName = findValidRandomTheme(themeName);
+			themeName = cfg->findValidRandomTheme(themeName);
 			if (themeName == "")
 			{
 				themeName = "default";
@@ -290,6 +316,7 @@ void App::Run()
 		pam.start("slim");
 		pam.set_item(PAM::Authenticator::TTY, DisplayName);
 		pam.set_item(PAM::Authenticator::Requestor, "root");
+		pam.setenv("XDG_SESSION_CLASS", "greeter");	// so eLogind works right
 	}
 	catch(PAM::Exception& e){
 		logStream << APPNAME << ": " << e << endl;
@@ -323,7 +350,8 @@ void App::Run()
 		}
 	}
 
-	if (!testing) {
+	if (!testing)
+	{
 		/* Create lock file */
 		LoginApp->GetLock();
 
@@ -382,14 +410,11 @@ void App::Run()
 	Scr = DefaultScreen(Dpy);
 	Root = RootWindow(Dpy, Scr);
 
-	// Intern _XROOTPMAP_ID property
-	BackgroundPixmapId = XInternAtom(Dpy, "_XROOTPMAP_ID", False);
-
 	/* for tests we use a standard window */
 	if (testing)
 	{
 		Window RealRoot = Root;		// already done RootWindow(Dpy, Scr);
-		Root = XCreateSimpleWindow(Dpy, RealRoot, 0, 0, 1280, 1024, 0, 0, 0);
+		Root = XCreateSimpleWindow(Dpy, RealRoot, 0, 0, tww, twh, 0, 0, 0);
 		XMapWindow(Dpy, Root);
 		XFlush(Dpy);
 	}
@@ -398,10 +423,11 @@ void App::Run()
 		blankScreen();
 	}
 
-	HideCursor();
-
 	/* Create panel */
-	LoginPanel = new Panel(Dpy, Scr, Root, cfg, themedir, Panel::Mode_DM);
+	LoginPanel = new Panel ( Dpy, Scr, Root, cfg, themedir,
+							( testing ? Panel::Mode_Test : Panel::Mode_DM ) );
+	LoginPanel->HideCursor();
+
 	bool firstloop = true; /* 1st time panel is shown (for automatic username) */
 	bool focuspass = cfg->getOption("focus_password")=="yes";
 	bool autologin = cfg->getOption("auto_login")=="yes";
@@ -446,7 +472,7 @@ void App::Run()
 		if (panelclosed)
 		{
 			/* Init root */
-			setBackground(themedir);
+			LoginPanel->setBackground();
 
 			/* Close all clients */
 			if (!testing)
@@ -612,24 +638,6 @@ int App::GetServerPID()
 	return ServerPID;
 }
 
-/* Hide the cursor */
-void App::HideCursor()
-{
-	if (cfg->getOption("hidecursor") == "true")
-	{
-		XColor			black;
-		char			cursordata[1];
-		Pixmap			cursorpixmap;
-		Cursor			cursor;
-		cursordata[0]=0;
-		cursorpixmap=XCreateBitmapFromData(Dpy,Root,cursordata,1,1);
-		black.red=0;
-		black.green=0;
-		black.blue=0;
-		cursor=XCreatePixmapCursor(Dpy,cursorpixmap,cursorpixmap,&black,&black,0,0);
-		XDefineCursor(Dpy,Root,cursor);
-	}
-}
 
 void App::Login()
 {
@@ -842,7 +850,7 @@ void App::Login()
 	if (killpg(pid, SIGTERM))
 		killpg(pid, SIGKILL);
 
-	HideCursor();
+	LoginPanel->HideCursor();
 
 #ifndef XNEST_DEBUG
 	RestartServer();	/// @bug recursive call!
@@ -937,7 +945,10 @@ void App::Exit()
 
 	if (testing)
 	{
-		const char* testmsg = "This is a test message :-)";
+		std::string testmsg = "User ";
+		testmsg += LoginPanel->GetName();
+		testmsg += " auth OK, session=";
+		testmsg += LoginPanel->getSession();
 		LoginPanel->Message(testmsg);
 		sleep(3);
 		delete LoginPanel;
@@ -1274,58 +1285,6 @@ void App::blankScreen()
 	XFreeGC(Dpy, gc);
 }
 
-void App::setBackground(const string& themedir)
-{
-	string filename;
-	filename = themedir + "/background.png";
-	Image *image = new Image;
-	bool loaded = image->Read(filename.c_str());
-	if (!loaded)
-	{ /* try jpeg if png failed */
-		filename = themedir + "/background.jpg";
-		loaded = image->Read(filename.c_str());
-	}
-
-	if (loaded)
-	{
-		string bgstyle = cfg->getOption("background_style");
-		if (bgstyle == "stretch")
-		{
-			image->Resize(XWidthOfScreen(ScreenOfDisplay(Dpy, Scr)),
-						XHeightOfScreen(ScreenOfDisplay(Dpy, Scr)));
-		}
-		else if (bgstyle == "tile")
-		{
-			image->Tile(XWidthOfScreen(ScreenOfDisplay(Dpy, Scr)),
-						XHeightOfScreen(ScreenOfDisplay(Dpy, Scr)));
-		}
-		else if (bgstyle == "center")
-		{
-			string hexvalue = cfg->getOption("background_color");
-			hexvalue = hexvalue.substr(1,6);
-			image->Center(XWidthOfScreen(ScreenOfDisplay(Dpy, Scr)),
-						XHeightOfScreen(ScreenOfDisplay(Dpy, Scr)),
-						hexvalue.c_str());
-		}
-		else
-		{ /* plain color or error */
-			string hexvalue = cfg->getOption("background_color");
-			hexvalue = hexvalue.substr(1,6);
-			image->Center(XWidthOfScreen(ScreenOfDisplay(Dpy, Scr)),
-						XHeightOfScreen(ScreenOfDisplay(Dpy, Scr)),
-						hexvalue.c_str());
-		}
-		Pixmap p = image->createPixmap(Dpy, Scr, Root);
-		XSetWindowBackgroundPixmap(Dpy, Root, p);
-		XChangeProperty(Dpy, Root, BackgroundPixmapId, XA_PIXMAP, 32,
-					PropModeReplace, (unsigned char *)&p, 1);
-	}
-	XClearWindow(Dpy, Root);
-
-	XFlush(Dpy);
-	delete image;
-}
-
 
 /* Check if there is a lockfile and a corresponding process */
 void App::GetLock()
@@ -1399,7 +1358,7 @@ void App::OpenLog()
 {
 	if ( !logStream.openLog( cfg->getOption("logfile").c_str() ) )
 	{
-		cerr <<  APPNAME << ": Could not accesss log file: " << cfg->getOption("logfile") << endl;
+		cerr <<  APPNAME << ": Could not access log file: " << cfg->getOption("logfile") << endl;
 		RemoveLock();
 		exit(ERR_EXIT);
 	}
@@ -1412,43 +1371,6 @@ void App::CloseLog()
 {
 	/* Simply closing the log */
 	logStream.closeLog();
-}
-
-
-/*
- * Choose a theme at random from the list in the config file. IF the theme
- * file cannot be found then issue a warning and try again.
- */
-string App::findValidRandomTheme(const string& set)
-{
-	/* extract random theme from theme set; return empty string on error */
-	string name = set;
-	struct stat buf;
-
-	if (name[name.length()-1] == ',')
-	{
-		name = name.substr(0, name.length() - 1);
-	}
-
-	Util::srandom(Util::makeseed());
-
-	vector<string> themes;
-	string themefile;
-	Cfg::split(themes, name, ',');
-	do {
-		int sel = Util::random() % themes.size();
-
-		name = Cfg::Trim(themes[sel]);
-		themefile = string(THEMESDIR) +"/" + name + THEMESFILE;
-		if (stat(themefile.c_str(), &buf) != 0)
-		{
-			themes.erase(find(themes.begin(), themes.end(), name));
-			logStream << APPNAME << ": Invalid theme in config: "
-				 << name << endl;
-			name = "";
-		}
-	} while (name == "" && themes.size());
-	return name;
 }
 
 

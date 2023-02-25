@@ -18,8 +18,8 @@ INCLUDE(GNUInstallDirs)
 
 # Version
 set(SLIM_VERSION_MAJOR "1")
-set(SLIM_VERSION_MINOR "3")
-set(SLIM_VERSION_PATCH "9")
+set(SLIM_VERSION_MINOR "4")
+set(SLIM_VERSION_PATCH "0")
 set(SLIM_VERSION "${SLIM_VERSION_MAJOR}.${SLIM_VERSION_MINOR}.${SLIM_VERSION_PATCH}")
 
 set(PKGDATADIR "${CMAKE_INSTALL_FULL_DATADIR}/slim")
@@ -63,8 +63,8 @@ set(common_srcs
 )
 if(USE_PAM)
 	set(common_srcs ${common_srcs} PAM.cpp)
-    # for now, only build slimlock if we are using PAM.
-    set(BUILD_SLIMLOCK 1)
+    # used to always build slimlock if we are using PAM. Removed as per Devuan
+    # set(BUILD_SLIMLOCK 1)
 endif(USE_PAM)
 
 # Build common library
@@ -113,7 +113,9 @@ if(USE_PAM)
 		set(SLIM_DEFINITIONS ${SLIM_DEFINITIONS} "-DUSE_PAM")
 		target_link_libraries(slim ${PAM_LIBRARY})
 		target_link_libraries(libslim ${PAM_LIBRARY})
-		target_link_libraries(slimlock ${PAM_LIBRARY})
+		if(BUILD_SLIMLOCK)
+			target_link_libraries(slimlock ${PAM_LIBRARY})
+		endif(BUILD_SLIMLOCK)
 		include_directories(${PAM_INCLUDE_DIR})
 	else(PAM_FOUND)
 		message("\tPAM Not Found")

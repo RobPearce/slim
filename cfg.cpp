@@ -2,7 +2,7 @@
  *  Copyright (C) 2004-06 Simone Rota <sip@varlock.com>
  *  Copyright (C) 2004-06 Johannes Winkelmann <jw@tks6.net>
  *  Copyright (C) 2012-13 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
- *  Copyright (C) 2022 Rob Pearce <slim@flitspace.org.uk>
+ *  Copyright (C) 2022-23 Rob Pearce <slim@flitspace.org.uk>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -13,6 +13,7 @@
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <algorithm>
 #include <unistd.h>
 #include <stdlib.h>
 
@@ -20,12 +21,19 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
+#include "util.h"	// for Util::random
+#include "log.h"	// for logStream
+
 #include "cfg.h"
 
 using namespace std;
 
 typedef pair<string,string> option;
 
+/**
+ * Constructor: creates the Cfg object and populates the available options
+ * with default values.
+ */
 Cfg::Cfg()
 	: currentSession(-1)
 {
@@ -44,8 +52,6 @@ Cfg::Cfg()
 	options.insert(option("sessionstop_cmd",""));
 	options.insert(option("console_cmd","/usr/bin/xterm -C -fg white -bg black +sb -g %dx%d+%d+%d -fn %dx%d -T ""Console login"" -e /bin/sh -c ""/bin/cat /etc/issue; exec /bin/login"""));
 	options.insert(option("screenshot_cmd","import -window root /slim.png"));
-	options.insert(option("welcome_msg","Welcome to %host"));
-	options.insert(option("session_msg","Session:"));
 	options.insert(option("default_user",""));
 	options.insert(option("focus_password","no"));
 	options.insert(option("auto_login","no"));
@@ -60,21 +66,22 @@ Cfg::Cfg()
 	options.insert(option("hidecursor","false"));
 
 	/* Theme stuff */
-	options.insert(option("input_panel_x","50%"));
+	options.insert(option("background_style","stretch"));
+	options.insert(option("background_color","#CCCCCC"));
+
+	options.insert(option("input_panel_x","50%"));	/* Panel position on screen */
 	options.insert(option("input_panel_y","40%"));
-	options.insert(option("input_name_x","200"));
-	options.insert(option("input_name_y","154"));
-	options.insert(option("input_pass_x","-1")); /* default is single inputbox */
-	options.insert(option("input_pass_y","-1"));
 	options.insert(option("input_font","Verdana:size=11"));
 	options.insert(option("input_color", "#000000"));
-	options.insert(option("input_cursor_height","20"));
-	options.insert(option("input_maxlength_name","20"));
-	options.insert(option("input_maxlength_passwd","20"));
 	options.insert(option("input_shadow_xoffset", "0"));
 	options.insert(option("input_shadow_yoffset", "0"));
 	options.insert(option("input_shadow_color","#FFFFFF"));
+	options.insert(option("input_name_x","200"));	/* relative to panel */
+	options.insert(option("input_name_y","154"));
+	options.insert(option("input_pass_x","-1")); /* default is single inputbox */
+	options.insert(option("input_pass_y","-1"));
 
+	options.insert(option("welcome_msg","Welcome to %host"));
 	options.insert(option("welcome_font","Verdana:size=14"));
 	options.insert(option("welcome_color","#FFFFFF"));
 	options.insert(option("welcome_x","-1"));
@@ -83,38 +90,30 @@ Cfg::Cfg()
 	options.insert(option("welcome_shadow_yoffset", "0"));
 	options.insert(option("welcome_shadow_color","#FFFFFF"));
 
-	options.insert(option("intro_msg",""));
-	options.insert(option("intro_font","Verdana:size=14"));
-	options.insert(option("intro_color","#FFFFFF"));
-	options.insert(option("intro_x","-1"));
-	options.insert(option("intro_y","-1"));
-
-	options.insert(option("background_style","stretch"));
-	options.insert(option("background_color","#CCCCCC"));
-
+	options.insert(option("username_msg","Please enter your username"));
 	options.insert(option("username_font","Verdana:size=12"));
 	options.insert(option("username_color","#FFFFFF"));
 	options.insert(option("username_x","-1"));
 	options.insert(option("username_y","-1"));
-	options.insert(option("username_msg","Please enter your username"));
 	options.insert(option("username_shadow_xoffset", "0"));
 	options.insert(option("username_shadow_yoffset", "0"));
 	options.insert(option("username_shadow_color","#FFFFFF"));
 
+	options.insert(option("password_msg","Please enter your password"));
 	options.insert(option("password_x","-1"));
 	options.insert(option("password_y","-1"));
-	options.insert(option("password_msg","Please enter your password"));
 
-	options.insert(option("msg_color","#FFFFFF"));
 	options.insert(option("msg_font","Verdana:size=16:bold"));
+	options.insert(option("msg_color","#FFFFFF"));
 	options.insert(option("msg_x","40"));
 	options.insert(option("msg_y","40"));
 	options.insert(option("msg_shadow_xoffset", "0"));
 	options.insert(option("msg_shadow_yoffset", "0"));
 	options.insert(option("msg_shadow_color","#FFFFFF"));
 
-	options.insert(option("session_color","#FFFFFF"));
+	options.insert(option("session_msg","Session:"));
 	options.insert(option("session_font","Verdana:size=16:bold"));
+	options.insert(option("session_color","#FFFFFF"));
 	options.insert(option("session_x","50%"));
 	options.insert(option("session_y","90%"));
 	options.insert(option("session_shadow_xoffset", "0"));
@@ -124,10 +123,11 @@ Cfg::Cfg()
 	// What to do if the authorisation fails
 	options.insert(option("keep_user_on_fail", "0"));
 	options.insert(option("wrong_passwd_timeout", "2"));
-	options.insert(option("passwd_feedback_x", "50%"));
-	options.insert(option("passwd_feedback_y", "10%"));
 	options.insert(option("passwd_feedback_msg", "Authentication failed"));
 	options.insert(option("passwd_feedback_capslock", "Authentication failed (CapsLock is on)"));
+	options.insert(option("passwd_feedback_x", "-1"));	/* no feedback by default */
+	options.insert(option("passwd_feedback_y", "-1"));
+	options.insert(option("bell", "0"));
 
 	// slimlock-specific options
 	options.insert(option("dpms_standby_timeout", "60"));
@@ -135,7 +135,6 @@ Cfg::Cfg()
 	options.insert(option("show_username", "1"));
 	options.insert(option("show_welcome_msg", "0"));
 	options.insert(option("tty_lock", "1"));
-	options.insert(option("bell", "1"));
 
 	error = "";
 }
@@ -145,9 +144,11 @@ Cfg::~Cfg()
 	options.clear();
 }
 
-/*
- * Creates the Cfg object and parses
- * known options from the given configfile / themefile
+/**
+ * Parses known options from the given configfile / themefile
+ * 
+ * @param	configfile	Path to configuration or theme
+ * @return				true on sucess, false if file not found
  */
 bool Cfg::readConf(string configfile)
 {
@@ -157,32 +158,35 @@ bool Cfg::readConf(string configfile)
 	map<string,string>::iterator it;
 	ifstream cfgfile(fn.c_str());
 
-	if (!cfgfile) {
+	if (!cfgfile)
+	{
 		error = "Cannot read configuration file: " + configfile;
 		return false;
 	}
-	while (getline(cfgfile, line)) {
-		if ((pos = line.find('\\')) != string::npos) {
-			if (line.length() == pos + 1) {
-				line.replace(pos, 1, " ");
-				next = next + line;
-				continue;
-			} else
-				line.replace(pos, line.length() - pos, " ");
+	while (getline(cfgfile, line))
+	{
+		// New parser to fix ticket #4
+		pos = line.length();
+		if ( ( pos > 0 ) && ( line[pos-1] == '\\' ) )
+		{
+			line.replace ( pos-1, 1, " " );
+			next = next + line;
+			continue;
 		}
 
-		if (!next.empty()) {
+		if ( !next.empty() )
+		{
 			line = next + line;
 			next = "";
 		}
-		it = options.begin();
-		while (it != options.end()) {
-			op = it->first;
-			n = line.find(op);
-			if (n == 0)
-				options[op] = parseOption(line, op);
-			++it;
-		}
+
+		// Ignore blank lines and comment lines
+		if ( line.empty() || line[0] == '#' )
+			continue;
+
+		// Now parse and assign
+		if ( !parseOption ( line ) )
+			cerr << error << '\n';	// not a fatal error
 	}
 	cfgfile.close();
 
@@ -191,11 +195,41 @@ bool Cfg::readConf(string configfile)
 	return true;
 }
 
-/* Returns the option value, trimmed */
-string Cfg::parseOption(string line, string option )
+/**
+ *  Sets an option value from a line. Returns true on success.
+ */
+bool Cfg::parseOption ( string line )
 {
-	return Trim( line.substr(option.size(), line.size() - option.size()));
+	size_t pos = 0;
+	const string delims = " \t";
+	string name, value;
+
+	// First split the line into a name/value pair
+	pos = line.find_first_of ( delims );
+	if ( pos == string::npos )
+	{
+		error = "Badly formed line: " + line;
+		return false;
+	}
+	name = line.substr ( 0, pos );
+	value = Trim ( line.substr ( pos ) );
+	if ( value.empty() )
+	{
+		error = "Badly formed line: " + line;
+		return false;
+	}
+
+	// Look to see if it's a known option
+	if ( options.find ( name ) == options.end() )
+	{
+		error = "Unknown option name: " + name;
+		return false;
+	}
+	// finally assign it
+	options[name] = value;
+	return true;
 }
+
 
 const string& Cfg::getError() const
 {
@@ -272,7 +306,19 @@ int Cfg::getIntOption(std::string option)
 	return string2int(options[option].c_str());
 }
 
-/* Get absolute position */
+
+/**
+ * Get absolute position
+ * 
+ * Converts a config position string into absolute coordinates. If the string 
+ * is a plain number, this is just an atoi but if there is a percentage sign 
+ * then the value is converted using the size of the canvas and the object.
+ * 
+ * @param	position	Configured position as a string
+ * @param	max			Size of canvas in the relevant axis
+ * @param	width		Size of the object being placed
+ * @return				Absolute coordinate to achieve placement
+ */
 int Cfg::absolutepos(const string& position, int max, int width)
 {
 	int n = position.find("%");
@@ -317,7 +363,8 @@ void Cfg::fillSessionList()
 
 	sessions.clear();
 
-	if( !strSessionDir.empty() ) {
+	if ( !strSessionDir.empty() )
+	{
 		DIR *pDir = opendir(strSessionDir.c_str());
 
 		if (pDir != NULL) {
@@ -364,15 +411,20 @@ void Cfg::fillSessionList()
 		}
 	}
 
-	if (sessions.empty()){
-		if (strSessionList.empty()) {
+	if (sessions.empty())
+	{
+		if (strSessionList.empty())
+		{
 			pair<string,string> session("","");
 			sessions.push_back(session);
-		} else {
+		}
+		else
+		{
 			// iterate through the split of the session list
 			vector<string> sessit;
 			split(sessit,strSessionList,',',false);
-			for (vector<string>::iterator it = sessit.begin(); it != sessit.end(); ++it) {
+			for (vector<string>::iterator it = sessit.begin(); it != sessit.end(); ++it)
+			{
 				pair<string,string> session(*it,*it);
 				sessions.push_back(session);
 			}
@@ -380,9 +432,47 @@ void Cfg::fillSessionList()
 	}
 }
 
+
 pair<string,string> Cfg::nextSession()
 {
 	currentSession = (currentSession + 1) % sessions.size();
 	return sessions[currentSession];
+}
+
+
+/*
+ * Choose a theme at random from the list in the config file. IF the theme
+ * file cannot be found then issue a warning and try again.
+ */
+string Cfg::findValidRandomTheme ( const string& set )
+{
+	/* extract random theme from theme set; return empty string on error */
+	string name = set;
+	struct stat buf;
+
+	if (name[name.length()-1] == ',')
+	{
+		name.erase(name.length() - 1);
+	}
+
+	Util::srandom(Util::makeseed());
+
+	vector<string> themes;
+	string themefile;
+	Cfg::split(themes, name, ',');
+	do {
+		int sel = Util::random() % themes.size();
+
+		name = Cfg::Trim(themes[sel]);
+		themefile = string(THEMESDIR) +"/" + name + THEMESFILE;
+		if (stat(themefile.c_str(), &buf) != 0)
+		{
+			themes.erase(find(themes.begin(), themes.end(), name));
+			logStream << APPNAME << ": Invalid theme in config: "
+				 << name << endl;
+			name = "";
+		}
+	} while (name == "" && themes.size());
+	return name;
 }
 

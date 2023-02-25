@@ -23,7 +23,7 @@ using namespace std;
 
 SwitchUser::SwitchUser(struct passwd *pw, Cfg *c, const string& display,
 					   char** _env)
-	: cfg(c), Pw(pw), displayName(display), env(_env)
+	: cfg(c), Pw(pw), env(_env)
 {
 }
 
@@ -58,7 +58,7 @@ void SwitchUser::Execute(const char* cmd)
 	execle(Pw->pw_shell, Pw->pw_shell, "-c", cmd, NULL, env);
 	/// @todo this copy-paste of App:CloseLog() should be cleaned up
 	if ( !logStream.openLog( cfg->getOption("logfile").c_str() ) ) {
-		cerr <<  APPNAME << ": Could not accesss log file: " << cfg->getOption("logfile") << endl;
+		cerr <<  APPNAME << ": Could not access log file: " << cfg->getOption("logfile") << endl;
 		exit(ERR_EXIT);
 	}
 	logStream << APPNAME << ": could not execute login command: " << strerror(errno) << endl;

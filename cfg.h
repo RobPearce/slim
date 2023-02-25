@@ -30,7 +30,7 @@ public:
 	~Cfg();
 
 	bool readConf(std::string configfile);
-	std::string parseOption(std::string line, std::string option);
+	bool parseOption ( std::string line );
 	const std::string& getError() const;
 	std::string& getOption(std::string option);
 	int getIntOption(std::string option);
@@ -43,6 +43,7 @@ public:
 	static std::string Trim(const std::string &s);
 
     std::pair<std::string,std::string> nextSession();
+	static std::string findValidRandomTheme(const std::string &set);
 
 private:
 	void fillSessionList();

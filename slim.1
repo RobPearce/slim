@@ -1,4 +1,4 @@
-.TH slim 1 "November 14, 2022" "" ""
+.TH slim 1 "January 14, 2023" "" ""
 .SH NAME
 \fBslim \fP- Simple LogIn Manager
 \fB
@@ -20,6 +20,10 @@ session style.
 select a non-standard configuration file instead of /etc/slim.conf
 .TP
 .B
+\fB-d\fP
+run as a daemon
+.TP
+.B
 \fB-n\fP
 do NOT run as a daemon
 .TP
@@ -32,6 +36,11 @@ nothing if consolekit support has not been built in.
 \fB-p\fP /path/to/theme
 display a preview of the theme. An already running X11 session
 is required for theme preview.
+.TP
+.B
+\fB-w\fP <www>x<hhh>
+set the size of the window used for theme preview. This option is only valid
+after a -p option
 .TP
 .B
 \fB-h\fP
@@ -47,12 +56,12 @@ display version information
 run \fBslim\fP in daemon mode
 .TP
 .B
-\fBslim\fP \fB-p\fP /usr/share/slim/themes/default
-preview of the default theme
+\fBslim\fP \fB-p\fP /usr/share/slim/themes/default \fB-w\fP 800x600
+preview of the default theme at low resolution
 .SH STARTING SLIM AT BOOT
 Please refer to the documentation of your Operating System to make \fBslim\fP
 automatically startup after the system boots. In particular, the method is
-very different between SysV, OpenRC and systemd init processes.
+very different between SysV, OpenRC, runit and systemd init processes.
 .SH CONFIGURATION
 Global configuration is stored in the /etc/slim.conf file. See the comments
 inside the file for a detailed explanation of the \fIoptions\fP.
@@ -64,11 +73,11 @@ Special usernames:
 .TP
 .B
 console
-open a xterm console
+open an xterm login console. No password needed
 .TP
 .B
 exit
-quit \fBslim\fP
+quit \fBslim\fP. No password needed. See the note in \fBBUGS\fI.
 .TP
 .B
 halt
@@ -83,8 +92,8 @@ suspend
 power-suspend the machine
 .PP
 See the configuration file for customizing the above commands.
-The 'halt' and 'reboot' commands need the root password, this may
-change in future releases.
+The 'halt' and 'reboot' commands need the root password, and hence may not 
+work on systems where root login is disabled.
 .PP
 Shortcuts:
 .TP
@@ -96,10 +105,11 @@ executes a custom command (by default takes a screenshot)
 F1
 choose session type from session list.
 .SH BUGS
-On login, \fBslim\fP relies on external tools, normally \fBsessreg\fP, to 
-provide the registration of the user's session. There seems to be a bug in 
-the common sessreg implementation which causes the registration to fail if 
-a user logs out then rapidly logs back in.
+When run as a daemon from OpenRC (and possibly other init systems), causing
+SLiM to quit can sometimes result in a blank screen and unresponsive computer.
+This includes when using the "exit" special username.
+.PP
+Probably still a few more but I'm working on them.
 .SH AUTHORS 
 Simone Rota <sip@varlock.com>
 .PP
@@ -109,5 +119,8 @@ Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
 .PP
 Rob Pearce <slim@flitspace.org.uk>
 .SH SEE ALSO
+.\" .BR slim.conf (5),		... once I've written one!
+.BR slimlock (1)
+.PP
 See the online documentation at the SLiM web site for further information
 on themes, FAQs, etc.
